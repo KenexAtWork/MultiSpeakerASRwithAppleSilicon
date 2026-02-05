@@ -61,13 +61,26 @@ uv pip install mlx-whisper pyannote-audio
 2. 接受模型使用條款：
    - https://huggingface.co/pyannote/speaker-diarization-3.1
    - https://huggingface.co/pyannote/segmentation-3.0
-3. 設定環境變數：
+3. 設定 token（三種方式任選一種）：
 
+**方式 A：使用 .env 檔案（推薦）**
+```bash
+# 複製範例檔案
+cp .env.example .env
+
+# 編輯 .env 並填入你的 token
+# HF_TOKEN=your_huggingface_token_here
+```
+
+**方式 B：設定環境變數**
 ```bash
 export HF_TOKEN=your_huggingface_token_here
 ```
 
-或複製 `.env.example` 為 `.env` 並填入 token。
+**方式 C：執行時指定**
+```bash
+./asr.sh video.mp4 --hf-token your_huggingface_token_here
+```
 
 **詳細申請教學：** [如何申請 Hugging Face Token](https://ithelp.ithome.com.tw/articles/10389679)
 

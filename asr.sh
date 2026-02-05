@@ -21,6 +21,15 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/.venv"
 PYTHON_SCRIPT="$SCRIPT_DIR/asr_multi_speaker_v5_fast.py"
 
+# 載入 .env 檔案（如果存在）
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    # 讀取 .env 並 export 變數
+    set -a  # 自動 export 所有變數
+    source "$SCRIPT_DIR/.env"
+    set +a  # 關閉自動 export
+    echo "✓ 已載入 .env 檔案"
+fi
+
 # 檢查虛擬環境是否存在
 if [ ! -d "$VENV_DIR" ]; then
     echo "錯誤：找不到虛擬環境 $VENV_DIR"
