@@ -84,6 +84,21 @@ uv pip install mlx-whisper pyannote-audio
 export HF_TOKEN=your_huggingface_token_here
 ```
 
+## 首次使用注意事項
+
+**第一次執行時會自動下載模型，需要一些時間：**
+
+1. **MLX Whisper 模型**（約 1.5 GB）
+   - 模型：`mlx-community/whisper-medium-mlx`
+   - 會自動下載到 `~/.cache/huggingface/`
+
+2. **Pyannote 說話者分離模型**（約 200 MB）
+   - 模型：`pyannote/speaker-diarization-3.1` 和 `pyannote/segmentation-3.0`
+   - 需要有效的 HF_TOKEN
+   - 會自動下載到 `~/.cache/torch/`
+
+**建議：** 首次使用時用較短的測試影片（1-2 分鐘），確認模型下載和環境設定都正常。
+
 ## 使用方式
 
 ### 方法 1：使用便捷腳本（推薦）
