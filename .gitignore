@@ -44,6 +44,14 @@ all.mp4
 *.wav
 *.mp3
 
+# 但允許 examples 目錄中的範例檔案
+!examples/*.mp4
+!examples/*.srt
+!examples/*.txt
+!examples/sample-output/*.srt
+!examples/sample-output/*.png
+!examples/sample-output/*.jpg
+
 # 敏感資訊
 .env
 config.local.json

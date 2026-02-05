@@ -120,6 +120,25 @@ export HF_TOKEN=your_huggingface_token_here
 
 ## 使用方式
 
+### 快速開始：使用範例影片
+
+```bash
+# 使用提供的範例影片測試
+./asr.sh examples/sample-01.mp4
+
+# 查看輸出結果
+cat examples/sample-01_transcription.srt
+
+# 或查看範例輸出（已預先處理好）
+cat examples/sample-output/sample-01_transcription.srt
+```
+
+範例目錄包含：
+- `sample-01.mp4` - 約 1 分鐘的多說話者對話影片
+- `sample-output/` - 預先處理好的輸出結果和截圖
+
+詳細說明請參考 [examples/README.md](examples/README.md)
+
 ### 方法 1：使用便捷腳本（推薦）
 
 ```bash
@@ -316,8 +335,12 @@ asr/
 ├── .gitignore                     # Git 忽略檔案
 ├── README.md                      # 本檔案
 ├── COMPARISON.md                  # 與 WhisperX 的比較
-├── SETUP_GIT.md                   # Git 設定說明
 ├── LICENSE                        # MIT 授權
+├── examples/                      # 範例檔案
+│   ├── sample-01.mp4             # 範例影片
+│   └── sample-output/            # 範例輸出結果
+│       ├── sample-01_transcription.srt
+│       └── *.png                 # 截圖
 ├── legacy/                        # 舊版本（參考用）
 │   ├── asr_multi_speaker_v4.py   # CPU 版本
 │   └── asr_simple.py             # 簡化版本
