@@ -110,23 +110,26 @@ export HF_TOKEN=your_huggingface_token_here
 ### 方法 1：使用便捷腳本（推薦）
 
 ```bash
-# 基本使用（自動產生輸出檔名）
+# 基本使用（自動產生輸出檔名，預設 SRT 格式）
 ./asr.sh video.mp4
 
 # 指定輸出檔名
-./asr.sh video.mp4 output.txt
+./asr.sh video.mp4 output.srt
+
+# 輸出為 TXT 格式
+./asr.sh video.mp4 output.txt --format txt
 
 # 指定語言
-./asr.sh video.mp4 output.txt --language en
+./asr.sh video.mp4 output.srt --language en
 
 # 只做 ASR 轉錄（跳過說話者分離）
-./asr.sh video.mp4 output.txt --skip-diarization
+./asr.sh video.mp4 output.srt --skip-diarization
 
 # 使用 CPU 而非 GPU
-./asr.sh video.mp4 output.txt --no-gpu
+./asr.sh video.mp4 output.srt --no-gpu
 
 # 自訂 HF token
-./asr.sh video.mp4 output.txt --hf-token YOUR_TOKEN
+./asr.sh video.mp4 output.srt --hf-token YOUR_TOKEN
 ```
 
 ### 方法 2：直接執行 Python 腳本
@@ -134,9 +137,18 @@ export HF_TOKEN=your_huggingface_token_here
 ```bash
 source .venv/bin/activate
 
+# 輸出 SRT 格式（預設）
+python asr_multi_speaker_v5_fast.py \
+  --input video.mp4 \
+  --output output.srt \
+  --language zh \
+  --hf-token YOUR_TOKEN
+
+# 輸出 TXT 格式
 python asr_multi_speaker_v5_fast.py \
   --input video.mp4 \
   --output output.txt \
+  --format txt \
   --language zh \
   --hf-token YOUR_TOKEN
 ```
@@ -189,9 +201,49 @@ MLX Whisper 可以處理語言混合的音訊（如中英混雜），有兩種�
 
 ## 輸出格式
 
-輸出為文字檔，格式如下：
+### SRT 格式（預設）
+
+標準字幕格式，可直接用於影片播放器：
 
 ```
+1
+00:00:00,000 --> 00:00:02,500
+[SPEAKER_00] 請 SA Kevin 這邊來做說明
+
+2
+00:00:02,500 --> 00:00:04,200
+[SPEAKER_00] 那我先把聲音交給 Kevin
+
+3
+00:00:06,239 --> 00:00:06,639
+[SPEAKER_01] 好
+
+4
+00:00:07,359 --> 00:00:09,960
+[SPEAKER_01] 各位 AW 長官還有各位同事大家好
+```
+
+### TXT 格式
+
+純文字格式，適合閱讀和編輯：
+
+```
+[SPEAKER_00] 00:00:00,000 --> 00:00:02,500
+請 SA Kevin 這邊來做說明
+
+[SPEAKER_00] 00:00:02,500 --> 00:00:04,200
+那我先把聲音交給 Kevin
+
+[SPEAKER_01] 00:00:06,239 --> 00:00:06,639
+好
+
+[SPEAKER_01] 00:00:07,359 --> 00:00:09,960
+各位 AW 長官還有各位同事大家好
+```
+
+使用 `--format txt` 參數可切換為 TXT 格式。
+
+## 疑難排解
 [SPEAKER_00] 00:00:00,000 --> 00:00:02,500
 請 SA Kevin 這邊來做說明
 

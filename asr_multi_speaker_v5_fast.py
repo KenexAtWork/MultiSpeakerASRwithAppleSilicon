@@ -35,6 +35,14 @@ def format_timestamp(seconds):
     millis = int((seconds % 1) * 1000)
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
+def format_timestamp_srt(seconds):
+    """將秒數轉換為 SRT 時間格式"""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millis = int((seconds % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
 def extract_audio_to_wav(video_file):
     """將影片檔案的音訊提取為 WAV 格式"""
     print("提取音訊為 WAV 格式...")
@@ -72,7 +80,7 @@ def extract_audio_to_wav(video_file):
             os.unlink(temp_wav_path)
         return None
 
-def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=None, skip_diarization=False, use_gpu=True):
+def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=None, skip_diarization=False, use_gpu=True, output_format="srt"):
     """ASR 轉錄 + 說話者分離（加速版）"""
     
     if not os.path.exists(video_file):
@@ -198,12 +206,22 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
         })
 
     # Step 4: 寫入檔案
-    print(f"寫入文字檔案: {output_file}")
+    print(f"寫入檔案: {output_file} (格式: {output_format.upper()})")
+    
     with open(output_file, "w", encoding="utf-8") as f:
-        for seg in all_segments:
-            timestamp = f"{format_timestamp(seg['start'])} --> {format_timestamp(seg['end'])}"
-            f.write(f"[{seg['speaker']}] {timestamp}\n")
-            f.write(f"{seg['text']}\n\n")
+        if output_format == "srt":
+            # SRT 格式
+            for seg in all_segments:
+                f.write(f"{seg['index']}\n")
+                timestamp = f"{format_timestamp_srt(seg['start'])} --> {format_timestamp_srt(seg['end'])}"
+                f.write(f"{timestamp}\n")
+                f.write(f"[{seg['speaker']}] {seg['text']}\n\n")
+        else:
+            # TXT 格式（原始格式）
+            for seg in all_segments:
+                timestamp = f"{format_timestamp(seg['start'])} --> {format_timestamp(seg['end'])}"
+                f.write(f"[{seg['speaker']}] {timestamp}\n")
+                f.write(f"{seg['text']}\n\n")
 
     # 統計
     total_duration = all_segments[-1]['end'] if all_segments else 0
@@ -236,6 +254,7 @@ def main():
     parser.add_argument('--input', required=True, help='輸入影片檔案')
     parser.add_argument('--language', default='zh', help='語言代碼（預設: zh）。混合語言音訊請省略此參數以啟用自動偵測')
     parser.add_argument('--output', help='輸出檔案路徑')
+    parser.add_argument('--format', choices=['srt', 'txt'], default='srt', help='輸出格式（預設: srt）')
     parser.add_argument('--hf-token', help='Hugging Face token（用於說話者分離）')
     parser.add_argument('--skip-diarization', action='store_true', help='跳過說話者分離')
     parser.add_argument('--no-gpu', action='store_true', help='停用 GPU 加速（使用 CPU）')
@@ -246,7 +265,8 @@ def main():
         output_file = args.output
     else:
         base_name = os.path.splitext(args.input)[0]
-        output_file = f"{base_name}_transcription_v5.txt"
+        ext = 'srt' if args.format == 'srt' else 'txt'
+        output_file = f"{base_name}_transcription_v5.{ext}"
     
     transcribe_with_speakers(
         video_file=args.input,
@@ -254,7 +274,8 @@ def main():
         language=args.language,
         hf_token=args.hf_token,
         skip_diarization=args.skip_diarization,
-        use_gpu=not args.no_gpu
+        use_gpu=not args.no_gpu,
+        output_format=args.format
     )
 
 if __name__ == "__main__":

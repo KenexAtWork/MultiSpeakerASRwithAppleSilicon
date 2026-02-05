@@ -52,6 +52,7 @@ if [ $# -lt 1 ]; then
     echo ""
     echo "參數說明："
     echo "  --language LANG    語言代碼（預設: zh）"
+    echo "  --format FORMAT    輸出格式：srt 或 txt（預設: srt）"
     echo "  --skip-diarization 跳過說話者分離"
     echo "  --no-gpu           停用 GPU 加速"
     echo "  --hf-token TOKEN   Hugging Face token（說話者分離需要）"
