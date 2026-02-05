@@ -212,15 +212,38 @@
 
 ## 混合方案
 
-可以結合兩者優勢：
+理論上可以結合兩者優勢，但有限制：
 
 ```bash
 # 在 Mac 上使用本專案快速轉錄
 ./asr.sh video.mp4 transcript.txt
 
-# 如果需要更精確的時間戳，再用 WhisperX 對齊
-whisperx transcript.txt --align-only
+# ⚠️ 注意：WhisperX 在 Apple Silicon 上需要特殊設定
+# 需要安裝 x86_64 版本的 Python 或使用 Rosetta
+# 且 --align-only 需要音訊檔案，不是文字檔案
 ```
+
+**實際上，在 Apple Silicon Mac 上：**
+
+1. **本專案已經提供字級時間戳**，對大多數應用已經足夠
+2. **WhisperX 在 M1/M2/M3 上效能較差**，因為：
+   - 需要透過 Rosetta 運行（x86_64 模式）
+   - 無法使用 MPS GPU
+   - 強制對齊需要額外的模型和時間
+
+3. **如果真的需要更精確的時間戳**，建議：
+   ```bash
+   # 方案 A：直接使用 WhisperX（但會比本專案慢）
+   whisperx video.mp4 --model large-v3 --diarize --hf_token YOUR_TOKEN
+   
+   # 方案 B：使用本專案，接受 ±0.5 秒的精度
+   ./asr.sh video.mp4 transcript.txt
+   ```
+
+**結論：**
+- 在 Apple Silicon Mac 上，**不建議混合使用**
+- 本專案已經是 Mac 上的最佳方案
+- 如果需要毫秒級精度，建議在 Linux + NVIDIA GPU 上使用 WhisperX
 
 ## 結論
 
