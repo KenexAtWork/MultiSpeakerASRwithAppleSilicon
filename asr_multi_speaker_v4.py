@@ -129,7 +129,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 print("執行說話者分離（這可能需要 10-20 分鐘）...")
                 print("提示：處理時間約為影片長度的 0.5-1 倍")
                 
-                diarization_result = pipeline(temp_wav_path)
+                # 使用 hook 顯示進度
+                from pyannote.audio.pipelines.utils.hook import ProgressHook
+                with ProgressHook() as hook:
+                    diarization_result = pipeline(temp_wav_path, hook=hook)
                 
                 # pyannote-audio 4.x 使用 speaker_diarization 屬性
                 if hasattr(diarization_result, 'speaker_diarization'):

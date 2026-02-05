@@ -20,7 +20,9 @@
 
 ## 安裝
 
-### 1. 安裝系統依賴
+### 方式一：從頭開始安裝
+
+#### 1. 安裝系統依賴
 
 ```bash
 # 安裝 Homebrew（如果還沒安裝）
@@ -34,10 +36,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.cargo/env
 ```
 
-### 2. 建立 Python 環境
+#### 2. Clone 專案並建立環境
 
 ```bash
-cd asr
+# Clone 專案
+git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
+cd MultiSpeakerASRwithAppleSilicon
 
 # 使用 uv 建立虛擬環境（使用 ARM64 原生 Python）
 uv venv --python /opt/homebrew/bin/python3
@@ -49,7 +53,7 @@ source .venv/bin/activate
 uv pip install mlx-whisper pyannote-audio
 ```
 
-### 3. 設定 Hugging Face Token
+#### 3. 設定 Hugging Face Token
 
 說話者分離功能需要 Hugging Face token：
 
@@ -66,6 +70,19 @@ export HF_TOKEN=your_huggingface_token_here
 或複製 `.env.example` 為 `.env` 並填入 token。
 
 **詳細申請教學：** [如何申請 Hugging Face Token](https://ithelp.ithome.com.tw/articles/10389679)
+
+### 方式二：快速安裝（已有 uv）
+
+如果你已經安裝了 uv 和 ffmpeg：
+
+```bash
+git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
+cd MultiSpeakerASRwithAppleSilicon
+uv venv --python /opt/homebrew/bin/python3
+source .venv/bin/activate
+uv pip install mlx-whisper pyannote-audio
+export HF_TOKEN=your_huggingface_token_here
+```
 
 ## 使用方式
 

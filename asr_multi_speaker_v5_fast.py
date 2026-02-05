@@ -139,7 +139,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 print("執行說話者分離...")
                 print("提示：使用 GPU 可加速 2-3 倍")
                 
-                diarization_result = pipeline(temp_wav_path)
+                # 使用 hook 顯示進度
+                from pyannote.audio.pipelines.utils.hook import ProgressHook
+                with ProgressHook() as hook:
+                    diarization_result = pipeline(temp_wav_path, hook=hook)
                 
                 # 提取說話者資訊
                 if hasattr(diarization_result, 'speaker_diarization'):
