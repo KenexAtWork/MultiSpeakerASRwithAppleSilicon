@@ -54,7 +54,9 @@ uv pip install mlx-whisper pyannote-audio
 說話者分離功能需要 Hugging Face token：
 
 1. 前往 https://huggingface.co/settings/tokens 建立 token
-2. 接受模型使用條款：https://huggingface.co/pyannote/speaker-diarization-3.1
+2. 接受模型使用條款：
+   - https://huggingface.co/pyannote/speaker-diarization-3.1
+   - https://huggingface.co/pyannote/segmentation-3.0
 3. 設定環境變數：
 
 ```bash
@@ -62,6 +64,8 @@ export HF_TOKEN=your_huggingface_token_here
 ```
 
 或複製 `.env.example` 為 `.env` 並填入 token。
+
+**詳細申請教學：** [如何申請 Hugging Face Token](https://ithelp.ithome.com.tw/articles/10389679)
 
 ## 使用方式
 
