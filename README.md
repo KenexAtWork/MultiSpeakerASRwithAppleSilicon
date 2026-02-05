@@ -112,6 +112,27 @@ python asr_multi_speaker_v5_fast.py \
 - `ru`: 俄文
 - `ko`: 韓文
 
+### 語言混合支援
+
+MLX Whisper 可以處理語言混合的音訊（如中英混雜），有兩種方式：
+
+**方法 1：自動偵測（推薦用於混合語言）**
+```bash
+# 不指定 --language，讓 Whisper 自動偵測
+./asr.sh video.mp4 output.txt
+```
+
+**方法 2：指定主要語言**
+```bash
+# 指定主要語言（如果音訊以中文為主）
+./asr.sh video.mp4 output.txt --language zh
+```
+
+**注意：**
+- 如果指定語言，Whisper 會用該語言模型處理整段音訊
+- 對於中英混雜的音訊，建議不指定語言，讓它自動偵測
+- 英文部分可能會被正確識別，也可能被轉成拼音（取決於比例）
+
 ## 效能
 
 在 M1 Pro (8 核心 CPU, 14 核心 GPU) 上的測試結果：

@@ -71,7 +71,7 @@ def transcribe_simple(video_file, output_file, language="zh"):
 def main():
     parser = argparse.ArgumentParser(description='簡化版 ASR 轉錄（不含說話者分離）')
     parser.add_argument('--input', required=True, help='輸入影片檔案')
-    parser.add_argument('--language', default='zh', help='語言代碼（預設: zh）')
+    parser.add_argument('--language', default='zh', help='語言代碼（預設: zh）。混合語言音訊請省略此參數以啟用自動偵測')
     parser.add_argument('--output', help='輸出檔案路徑')
     
     args = parser.parse_args()
