@@ -83,6 +83,9 @@ def extract_audio_to_wav(video_file):
 def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=None, skip_diarization=False, use_gpu=True, output_format="srt"):
     """ASR 轉錄 + 說話者分離（加速版）"""
     
+    import time
+    start_time = time.time()
+    
     if not os.path.exists(video_file):
         print(f"錯誤: 檔案不存在 - {video_file}")
         sys.exit(1)
@@ -226,11 +229,23 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     # 統計
     total_duration = all_segments[-1]['end'] if all_segments else 0
     speakers = set(seg['speaker'] for seg in all_segments)
+    
+    # 計算執行時間和處理速度
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    
+    # 計算處理速度倍率（處理時間 / 影片時長）
+    if total_duration > 0:
+        speed_ratio = elapsed_time / total_duration
+    else:
+        speed_ratio = 0
 
     print("=" * 60)
     print("✓ 處理完成！")
     print(f"✓ 共處理 {len(all_segments)} 個字幕段落")
-    print(f"✓ 總時長: {format_timestamp(total_duration)}")
+    print(f"✓ 影片時長: {format_timestamp(total_duration)}")
+    print(f"✓ 處理時間: {int(elapsed_time // 60)} 分 {int(elapsed_time % 60)} 秒")
+    print(f"✓ 處理速度: {speed_ratio:.2f}x（{1/speed_ratio:.2f}x 即時速度）" if speed_ratio > 0 else "✓ 處理速度: N/A")
     print(f"✓ 偵測到的說話者: {', '.join(sorted(speakers))}")
     print(f"✓ 輸出檔案: {output_file}")
     print("=" * 60)
@@ -266,7 +281,7 @@ def main():
     else:
         base_name = os.path.splitext(args.input)[0]
         ext = 'srt' if args.format == 'srt' else 'txt'
-        output_file = f"{base_name}_transcription_v5.{ext}"
+        output_file = f"{base_name}_transcription.{ext}"
     
     transcribe_with_speakers(
         video_file=args.input,
