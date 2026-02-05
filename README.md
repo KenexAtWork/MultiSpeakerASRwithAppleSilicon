@@ -86,18 +86,24 @@ export HF_TOKEN=your_huggingface_token_here
 
 ## 首次使用注意事項
 
-**第一次執行時會自動下載模型，需要一些時間：**
+**⚠️ 第一次執行時會自動下載模型，需要較長時間和網路流量：**
 
 1. **MLX Whisper 模型**（約 1.5 GB）
    - 模型：`mlx-community/whisper-medium-mlx`
-   - 會自動下載到 `~/.cache/huggingface/`
+   - 下載時間：視網速而定，通常需要 5-15 分鐘
+   - 儲存位置：`~/.cache/huggingface/`
 
 2. **Pyannote 說話者分離模型**（約 200 MB）
    - 模型：`pyannote/speaker-diarization-3.1` 和 `pyannote/segmentation-3.0`
    - 需要有效的 HF_TOKEN
-   - 會自動下載到 `~/.cache/torch/`
+   - 儲存位置：`~/.cache/torch/`
 
-**建議：** 首次使用時用較短的測試影片（1-2 分鐘），確認模型下載和環境設定都正常。
+**總下載量：約 1.7 GB**
+
+**建議：**
+- 首次使用時確保網路連線穩定
+- 用較短的測試影片（1-2 分鐘）進行首次測試
+- 模型下載完成後，後續使用就不需要再下載了
 
 ## 使用方式
 
