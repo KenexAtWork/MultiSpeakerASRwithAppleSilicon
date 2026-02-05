@@ -298,12 +298,18 @@ uv venv --python /opt/homebrew/bin/python3
 asr/
 ├── asr.sh                          # 便捷執行腳本
 ├── asr_multi_speaker_v5_fast.py   # 主程式（GPU 加速版）
-├── asr_multi_speaker_v4.py        # 舊版（CPU 版本）
-├── asr_simple.py                  # 簡化版（只做 ASR）
 ├── pyproject.toml                 # Python 專案設定
 ├── .env.example                   # 環境變數範例
 ├── .gitignore                     # Git 忽略檔案
-└── README.md                      # 本檔案
+├── README.md                      # 本檔案
+├── COMPARISON.md                  # 與 WhisperX 的比較
+├── SETUP_GIT.md                   # Git 設定說明
+├── LICENSE                        # MIT 授權
+├── legacy/                        # 舊版本（參考用）
+│   ├── asr_multi_speaker_v4.py   # CPU 版本
+│   └── asr_simple.py             # 簡化版本
+└── scripts/                       # 維護腳本
+    └── cleanup_for_git.sh        # Git 清理腳本
 ```
 
 ## 授權
