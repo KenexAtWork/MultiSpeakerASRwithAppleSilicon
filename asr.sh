@@ -83,7 +83,7 @@ fi
 ARGS=("--input" "$INPUT_FILE")
 
 # 如果第一個參數不是以 -- 開頭，視為輸出檔案
-if [ $# -gt 0 ] && [[ ! "$1" =~ ^-- ]]; then
+if [[ $# -gt 0 ]] && [[ ! "$1" =~ ^-- ]]; then
     OUTPUT_FILE="$1"
     # 將相對路徑轉換為絕對路徑
     if [[ "$OUTPUT_FILE" != /* ]]; then
@@ -105,9 +105,9 @@ for arg in "${ARGS[@]}"; do
     fi
 done
 
-if [ "$HAS_TOKEN" = false ]; then
+if [[ "$HAS_TOKEN" == false ]]; then
     # 檢查環境變數
-    if [ -n "$HF_TOKEN" ]; then
+    if [[ -n "$HF_TOKEN" ]]; then
         ARGS+=("--hf-token" "$HF_TOKEN")
     else
         echo "警告：未提供 Hugging Face token"
