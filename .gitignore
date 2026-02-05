@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+whisper_env/
+venv_arm64/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 輸出檔案
+*_transcription*.txt
+*.log
+all_processing.log
+all_v5_fast.log
+all_full_run.log
+
+# 測試檔案
+test_*.txt
+all_90s.mp4
+all_3min.mp4
+all.mp4
+*.mp4
+*.wav
+*.mp3
+
+# 敏感資訊
+.env
+config.local.json
+*_local.*
+
+# Hugging Face cache
+.cache/
