@@ -11,6 +11,7 @@ import argparse
 import tempfile
 import subprocess
 from pathlib import Path
+from datetime import datetime
 
 # M1 Mac 優化 - 使用所有效能核心
 os.environ["OMP_NUM_THREADS"] = "8"
@@ -26,6 +27,14 @@ torch.load = _patched_load
 
 import mlx_whisper
 from pyannote.audio import Pipeline
+
+def timestamp():
+    """返回當前時間戳記"""
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+def tprint(msg):
+    """帶時間戳記的 print"""
+    tprint(f"[{timestamp()}] {msg}")
 
 def format_timestamp(seconds):
     """將秒數轉換為時間格式"""
@@ -45,7 +54,7 @@ def format_timestamp_srt(seconds):
 
 def extract_audio_to_wav(video_file):
     """將影片檔案的音訊提取為 WAV 格式"""
-    print("提取音訊為 WAV 格式...")
+    tprint("提取音訊為 WAV 格式...")
     
     temp_wav = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
     temp_wav_path = temp_wav.name
@@ -67,15 +76,15 @@ def extract_audio_to_wav(video_file):
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
-            print(f"警告：ffmpeg 提取音訊失敗")
+            tprint(f"警告：ffmpeg 提取音訊失敗")
             os.unlink(temp_wav_path)
             return None
         
-        print(f"✓ 音訊已提取至臨時檔案（16kHz 單聲道 WAV）")
+        tprint(f"✓ 音訊已提取至臨時檔案（16kHz 單聲道 WAV）")
         return temp_wav_path
         
     except Exception as e:
-        print(f"提取音訊時發生錯誤：{str(e)}")
+        tprint(f"提取音訊時發生錯誤：{str(e)}")
         if os.path.exists(temp_wav_path):
             os.unlink(temp_wav_path)
         return None
@@ -85,18 +94,21 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     
     import time
     import gc
+    
+    # 打印開始時間
+    tprint(f"========== 開始處理 ==========")
     start_time = time.time()
     
     if not os.path.exists(video_file):
-        print(f"錯誤: 檔案不存在 - {video_file}")
+        tprint(f"錯誤: 檔案不存在 - {video_file}")
         sys.exit(1)
 
-    print(f"處理檔案: {video_file}")
-    print(f"輸出檔案: {output_file}")
-    print(f"語言: {language}")
-    print(f"模型大小: {model_size}")
-    print(f"GPU 加速: {'啟用 (MPS)' if use_gpu else '停用 (CPU)'}")
-    print("=" * 60)
+    tprint(f"處理檔案: {video_file}")
+    tprint(f"輸出檔案: {output_file}")
+    tprint(f"語言: {language}")
+    tprint(f"模型大小: {model_size}")
+    tprint(f"GPU 加速: {'啟用 (MPS)' if use_gpu else '停用 (CPU)'}")
+    tprint("=" * 60)
 
     # Step 1: ASR 轉錄
     model_map = {
@@ -108,9 +120,9 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     }
     model_path = model_map.get(model_size, model_map["medium"])
     
-    print(f"[1/2] 執行 ASR 轉錄（模型: {model_size}）...")
-    print(f"⏳ 載入 Whisper 模型（首次使用需下載，約 1.5 GB）...")
-    print(f"   模型路徑: {model_path}")
+    tprint(f"[1/2] 執行 ASR 轉錄（模型: {model_size}）...")
+    tprint(f"⏳ 載入 Whisper 模型（首次使用需下載，約 1.5 GB）...")
+    tprint(f"   模型路徑: {model_path}")
     
     # 在獨立作用域中執行 ASR，確保變數被釋放
     segments = None
@@ -122,18 +134,18 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
             word_timestamps=True,
             verbose=False
         )
-        print("✓ 模型載入完成，開始轉錄...")
-        print(f"✓ 偵測到的語言: {result.get('language', 'unknown')}")
+        tprint("✓ 模型載入完成，開始轉錄...")
+        tprint(f"✓ 偵測到的語言: {result.get('language', 'unknown')}")
         
         # 立即複製需要的資料
         segments = result["segments"]
-        print(f"✓ 共 {len(segments)} 個字幕段落")
+        tprint(f"✓ 共 {len(segments)} 個字幕段落")
         
         # 立即刪除 result
         del result
         
     except Exception as e:
-        print(f"錯誤: ASR 轉錄失敗 - {str(e)}")
+        tprint(f"錯誤: ASR 轉錄失敗 - {str(e)}")
         sys.exit(1)
     
     # 強制記憶體清理
@@ -145,14 +157,14 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     try:
         import mlx.core as mx
         mx.clear_cache()
-        print("✓ 已清理 MLX 快取")
+        tprint("✓ 已清理 MLX 快取")
     except:
         pass
     
-    print("✓ 已釋放 ASR 模型記憶體")
+    tprint("✓ 已釋放 ASR 模型記憶體")
     
     # 給系統時間釋放記憶體
-    print("⏳ 等待記憶體釋放...")
+    tprint("⏳ 等待記憶體釋放...")
     time.sleep(1)
 
     # Step 2: 說話者分離
@@ -160,10 +172,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     temp_wav_path = None
     
     if not skip_diarization and hf_token:
-        print("[2/2] 執行說話者分離（加速版）...")
+        tprint("[2/2] 執行說話者分離（加速版）...")
         
         # 提取音訊
-        print("⏳ 提取音訊為 WAV 格式...")
+        tprint("⏳ 提取音訊為 WAV 格式...")
         temp_wav_path = extract_audio_to_wav(video_file)
         
         if temp_wav_path:
@@ -247,10 +259,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
         else:
             print("⚠ 無法提取音訊，將不標記說話者")
     else:
-        print("[2/2] 跳過說話者分離")
+        tprint("[2/2] 跳過說話者分離")
 
     # Step 3: 合併結果
-    print(f"⏳ 合併轉錄結果（共 {len(segments)} 個段落）...")
+    tprint(f"⏳ 合併轉錄結果（共 {len(segments)} 個段落）...")
     all_segments = []
 
     for i, segment in enumerate(segments, 1):
@@ -271,10 +283,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
             'text': segment['text'].strip()
         })
     
-    print("✓ 合併完成")
+    tprint("✓ 合併完成")
 
     # Step 4: 寫入檔案
-    print(f"⏳ 寫入檔案: {output_file} (格式: {output_format.upper()})...")
+    tprint(f"⏳ 寫入檔案: {output_file} (格式: {output_format.upper()})...")
     
     with open(output_file, "w", encoding="utf-8") as f:
         if output_format == "srt":
@@ -291,10 +303,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 f.write(f"[{seg['speaker']}] {timestamp}\n")
                 f.write(f"{seg['text']}\n\n")
     
-    print("✓ 檔案寫入完成")
+    tprint("✓ 檔案寫入完成")
 
     # 統計
-    print("⏳ 計算統計資訊...")
+    tprint("⏳ 計算統計資訊...")
     total_duration = all_segments[-1]['end'] if all_segments else 0
     speakers = set(seg['speaker'] for seg in all_segments)
     
@@ -308,15 +320,15 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     else:
         speed_ratio = 0
 
-    print("=" * 60)
-    print("✓ 處理完成！")
-    print(f"✓ 共處理 {len(all_segments)} 個字幕段落")
-    print(f"✓ 影片時長: {format_timestamp(total_duration)}")
-    print(f"✓ 處理時間: {int(elapsed_time // 60)} 分 {int(elapsed_time % 60)} 秒")
-    print(f"✓ 處理速度: {speed_ratio:.2f}x（{1/speed_ratio:.2f}x 即時速度）" if speed_ratio > 0 else "✓ 處理速度: N/A")
-    print(f"✓ 偵測到的說話者: {', '.join(sorted(speakers))}")
-    print(f"✓ 輸出檔案: {output_file}")
-    print("=" * 60)
+    tprint("=" * 60)
+    tprint("✓ 處理完成！")
+    tprint(f"✓ 共處理 {len(all_segments)} 個字幕段落")
+    tprint(f"✓ 影片時長: {format_timestamp(total_duration)}")
+    tprint(f"✓ 處理時間: {int(elapsed_time // 60)} 分 {int(elapsed_time % 60)} 秒")
+    tprint(f"✓ 處理速度: {speed_ratio:.2f}x（{1/speed_ratio:.2f}x 即時速度）" if speed_ratio > 0 else "✓ 處理速度: N/A")
+    tprint(f"✓ 偵測到的說話者: {', '.join(sorted(speakers))}")
+    tprint(f"✓ 輸出檔案: {output_file}")
+    tprint("=" * 60)
 
 def main():
     parser = argparse.ArgumentParser(
