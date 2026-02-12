@@ -98,6 +98,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     # 打印開始時間
     tprint(f"========== 開始處理 ==========")
     start_time = time.time()
+    stage_times = {}  # 記錄各階段時間
     
     if not os.path.exists(video_file):
         tprint(f"錯誤: 檔案不存在 - {video_file}")
@@ -111,6 +112,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     tprint("=" * 60)
 
     # Step 1: ASR 轉錄
+    asr_start = time.time()
     model_map = {
         "tiny": "mlx-community/whisper-tiny-mlx",
         "base": "mlx-community/whisper-base-mlx",
@@ -166,8 +168,13 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     # 給系統時間釋放記憶體
     tprint("⏳ 等待記憶體釋放...")
     time.sleep(1)
+    
+    # 記錄 ASR 階段時間
+    asr_end = time.time()
+    stage_times['asr'] = asr_end - asr_start
 
     # Step 2: 說話者分離
+    diarization_start = time.time()
     speaker_timeline = []
     temp_wav_path = None
     
@@ -260,6 +267,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
             tprint("⚠ 無法提取音訊，將不標記說話者")
     else:
         tprint("[2/2] 跳過說話者分離")
+    
+    # 記錄說話者分離階段時間
+    diarization_end = time.time()
+    stage_times['diarization'] = diarization_end - diarization_start
 
     # Step 3: 合併結果
     tprint(f"⏳ 合併轉錄結果（共 {len(segments)} 個段落）...")
@@ -317,17 +328,28 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     # 計算處理速度倍率（處理時間 / 影片時長）
     if total_duration > 0:
         speed_ratio = elapsed_time / total_duration
+        realtime_speed = 1 / speed_ratio
     else:
         speed_ratio = 0
+        realtime_speed = 0
 
     tprint("=" * 60)
     tprint("✓ 處理完成！")
-    tprint(f"✓ 共處理 {len(all_segments)} 個字幕段落")
-    tprint(f"✓ 影片時長: {format_timestamp(total_duration)}")
-    tprint(f"✓ 處理時間: {int(elapsed_time // 60)} 分 {int(elapsed_time % 60)} 秒")
-    tprint(f"✓ 處理速度: {speed_ratio:.2f}x（{1/speed_ratio:.2f}x 即時速度）" if speed_ratio > 0 else "✓ 處理速度: N/A")
-    tprint(f"✓ 偵測到的說話者: {', '.join(sorted(speakers))}")
-    tprint(f"✓ 輸出檔案: {output_file}")
+    tprint("")
+    tprint("📊 處理統計：")
+    tprint(f"  • 影片時長: {format_timestamp(total_duration)}")
+    tprint(f"  • 總處理時間: {int(elapsed_time // 60)} 分 {int(elapsed_time % 60)} 秒")
+    tprint(f"  • 處理速度: {speed_ratio:.2f}x 處理時間 = {realtime_speed:.2f}x 即時速度" if speed_ratio > 0 else "  • 處理速度: N/A")
+    tprint("")
+    tprint("⏱️  各階段耗時：")
+    tprint(f"  • ASR 轉錄: {int(stage_times.get('asr', 0))} 秒 ({stage_times.get('asr', 0) / elapsed_time * 100:.1f}%)")
+    tprint(f"  • 說話者分離: {int(stage_times.get('diarization', 0))} 秒 ({stage_times.get('diarization', 0) / elapsed_time * 100:.1f}%)")
+    tprint(f"  • 其他處理: {int(elapsed_time - stage_times.get('asr', 0) - stage_times.get('diarization', 0))} 秒")
+    tprint("")
+    tprint(f"📝 輸出結果：")
+    tprint(f"  • 字幕段落: {len(all_segments)} 個")
+    tprint(f"  • 偵測說話者: {', '.join(sorted(speakers))}")
+    tprint(f"  • 輸出檔案: {output_file}")
     tprint("=" * 60)
 
 def main():

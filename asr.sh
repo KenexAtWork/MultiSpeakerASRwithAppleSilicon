@@ -8,9 +8,9 @@
 
 set -e
 
-# 時間戳記函數
+# 時間戳記函數（macOS 相容）
 timestamp() {
-    date '+%H:%M:%S.%3N'
+    python3 -c "from datetime import datetime; print(datetime.now().strftime('%H:%M:%S.%f')[:-3])"
 }
 
 # 帶時間戳記的 echo
