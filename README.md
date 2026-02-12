@@ -154,6 +154,11 @@ cat examples/sample-output/sample-01_transcription.srt
 # 指定語言
 ./asr.sh video.mp4 output.srt --language en
 
+# 選擇 Whisper 模型大小（預設：medium）
+./asr.sh video.mp4 output.srt --model small   # 記憶體使用 ~3-4 GB
+./asr.sh video.mp4 output.srt --model base    # 記憶體使用 ~2-3 GB
+./asr.sh video.mp4 output.srt --model large   # 記憶體使用 ~8-10 GB
+
 # 只做 ASR 轉錄（跳過說話者分離）
 ./asr.sh video.mp4 output.srt --skip-diarization
 
@@ -218,6 +223,36 @@ MLX Whisper 可以處理語言混合的音訊（如中英混雜），有兩種�
 - 如果指定語言，Whisper 會用該語言模型處理整段音訊
 - 對於中英混雜的音訊，建議不指定語言，讓它自動偵測
 - 英文部分可能會被正確識別，也可能被轉成拼音（取決於比例）
+
+## 模型選擇
+
+MLX Whisper 支援多種模型大小，可根據記憶體和準確度需求選擇：
+
+| 模型 | 記憶體使用 | 準確度 | 速度 | 適用場景 |
+|------|-----------|--------|------|---------|
+| `tiny` | ~1-2 GB | ⭐⭐ | 最快 | 快速測試、草稿 |
+| `base` | ~2-3 GB | ⭐⭐⭐ | 很快 | 簡單對話、記憶體受限 |
+| `small` | ~3-4 GB | ⭐⭐⭐⭐ | 快 | 一般會議、推薦選擇 |
+| `medium` | ~5-7 GB | ⭐⭐⭐⭐⭐ | 中等 | 預設值、高品質需求 |
+| `large` | ~8-10 GB | ⭐⭐⭐⭐⭐ | 較慢 | 最高準確度需求 |
+
+**使用範例：**
+```bash
+# 使用 small 模型（推薦用於 8GB 記憶體的 Mac）
+./asr.sh video.mp4 --model small
+
+# 使用 base 模型（最省記憶體）
+./asr.sh video.mp4 --model base
+
+# 使用 large 模型（最高準確度）
+./asr.sh video.mp4 --model large
+```
+
+**選擇建議：**
+- 8GB RAM Mac：推薦 `small` 或 `base`
+- 16GB RAM Mac：推薦 `small` 或 `medium`（預設）
+- 32GB+ RAM Mac：可使用 `large`
+- 中英混合語音：建議至少使用 `small` 以上
 
 ## 效能
 
