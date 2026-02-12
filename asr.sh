@@ -147,5 +147,6 @@ echo "執行 ASR 轉錄..."
 echo "當前目錄: $(pwd)"
 echo "輸入檔案: $INPUT_FILE"
 echo ""
+echo "⏳ 啟動 Python 環境並載入模組..."
 
 python "$PYTHON_SCRIPT" "${ARGS[@]}"
