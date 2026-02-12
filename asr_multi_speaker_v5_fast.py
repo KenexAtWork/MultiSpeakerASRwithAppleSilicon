@@ -80,10 +80,11 @@ def extract_audio_to_wav(video_file):
             os.unlink(temp_wav_path)
         return None
 
-def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=None, skip_diarization=False, use_gpu=True, output_format="srt"):
-    """ASR 轉錄 + 說話者分離（加速版）"""
+def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=None, skip_diarization=False, use_gpu=True, output_format="srt", model_size="medium"):
+    """ASR 轉錄 + 說話者分離（加速版 + 記憶體優化）"""
     
     import time
+    import gc
     start_time = time.time()
     
     if not os.path.exists(video_file):
@@ -93,26 +94,61 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     print(f"處理檔案: {video_file}")
     print(f"輸出檔案: {output_file}")
     print(f"語言: {language}")
+    print(f"模型大小: {model_size}")
     print(f"GPU 加速: {'啟用 (MPS)' if use_gpu else '停用 (CPU)'}")
     print("=" * 60)
 
     # Step 1: ASR 轉錄
-    print("[1/2] 執行 ASR 轉錄...")
+    model_map = {
+        "tiny": "mlx-community/whisper-tiny-mlx",
+        "base": "mlx-community/whisper-base-mlx",
+        "small": "mlx-community/whisper-small-mlx",
+        "medium": "mlx-community/whisper-medium-mlx",
+        "large": "mlx-community/whisper-large-v3-mlx"
+    }
+    model_path = model_map.get(model_size, model_map["medium"])
+    
+    print(f"[1/2] 執行 ASR 轉錄（模型: {model_size}）...")
+    
+    # 在獨立作用域中執行 ASR，確保變數被釋放
+    segments = None
     try:
         result = mlx_whisper.transcribe(
             video_file,
-            path_or_hf_repo="mlx-community/whisper-medium-mlx",
+            path_or_hf_repo=model_path,
             language=language,
             word_timestamps=True,
             verbose=False
         )
         print(f"✓ 偵測到的語言: {result.get('language', 'unknown')}")
+        
+        # 立即複製需要的資料
+        segments = result["segments"]
+        print(f"✓ 共 {len(segments)} 個字幕段落")
+        
+        # 立即刪除 result
+        del result
+        
     except Exception as e:
         print(f"錯誤: ASR 轉錄失敗 - {str(e)}")
         sys.exit(1)
-
-    segments = result["segments"]
-    print(f"✓ 共 {len(segments)} 個字幕段落")
+    
+    # 強制記憶體清理
+    gc.collect()
+    gc.collect()
+    gc.collect()  # 多次執行確保清理
+    
+    # 嘗試清理 MLX 快取（如果有的話）
+    try:
+        import mlx.core as mx
+        mx.metal.clear_cache()
+    except:
+        pass
+    
+    print("✓ 已釋放 ASR 模型記憶體")
+    
+    # 給系統時間釋放記憶體
+    time.sleep(1)
 
     # Step 2: 說話者分離
     speaker_timeline = []
@@ -170,9 +206,27 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 num_speakers = len(set(sp['speaker'] for sp in speaker_timeline))
                 print(f"✓ 偵測到 {num_speakers} 位說話者")
                 
+                # 立即釋放說話者分離模型記憶體
+                del pipeline
+                del diarization_result
+                
+                # 強制記憶體清理
+                import gc
+                gc.collect()
+                gc.collect()
+                gc.collect()
+                
+                if use_gpu and torch.backends.mps.is_available():
+                    torch.mps.empty_cache()
+                
+                print("✓ 已釋放說話者分離模型記憶體")
+                
             except Exception as e:
                 print(f"⚠ 說話者分離失敗: {str(e)}")
                 speaker_timeline = []
+                # 確保即使失敗也清理記憶體
+                import gc
+                gc.collect()
             finally:
                 # 清理臨時檔案
                 if temp_wav_path and os.path.exists(temp_wav_path):
@@ -270,6 +324,8 @@ def main():
     parser.add_argument('--language', default='zh', help='語言代碼（預設: zh）。混合語言音訊請省略此參數以啟用自動偵測')
     parser.add_argument('--output', help='輸出檔案路徑')
     parser.add_argument('--format', choices=['srt', 'txt'], default='srt', help='輸出格式（預設: srt）')
+    parser.add_argument('--model', choices=['tiny', 'base', 'small', 'medium', 'large'], default='medium',
+                        help='Whisper 模型大小（預設: medium）。記憶體不足時可用 small 或 base')
     parser.add_argument('--hf-token', help='Hugging Face token（用於說話者分離）')
     parser.add_argument('--skip-diarization', action='store_true', help='跳過說話者分離')
     parser.add_argument('--no-gpu', action='store_true', help='停用 GPU 加速（使用 CPU）')
@@ -290,7 +346,8 @@ def main():
         hf_token=args.hf_token,
         skip_diarization=args.skip_diarization,
         use_gpu=not args.no_gpu,
-        output_format=args.format
+        output_format=args.format,
+        model_size=args.model
     )
 
 if __name__ == "__main__":
