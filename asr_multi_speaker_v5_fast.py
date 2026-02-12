@@ -109,6 +109,8 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     model_path = model_map.get(model_size, model_map["medium"])
     
     print(f"[1/2] 執行 ASR 轉錄（模型: {model_size}）...")
+    print(f"⏳ 載入 Whisper 模型（首次使用需下載，約 1.5 GB）...")
+    print(f"   模型路徑: {model_path}")
     
     # 在獨立作用域中執行 ASR，確保變數被釋放
     segments = None
@@ -120,6 +122,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
             word_timestamps=True,
             verbose=False
         )
+        print("✓ 模型載入完成，開始轉錄...")
         print(f"✓ 偵測到的語言: {result.get('language', 'unknown')}")
         
         # 立即複製需要的資料
@@ -141,13 +144,15 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     # 嘗試清理 MLX 快取（如果有的話）
     try:
         import mlx.core as mx
-        mx.metal.clear_cache()
+        mx.clear_cache()
+        print("✓ 已清理 MLX 快取")
     except:
         pass
     
     print("✓ 已釋放 ASR 模型記憶體")
     
     # 給系統時間釋放記憶體
+    print("⏳ 等待記憶體釋放...")
     time.sleep(1)
 
     # Step 2: 說話者分離
@@ -158,11 +163,12 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
         print("[2/2] 執行說話者分離（加速版）...")
         
         # 提取音訊
+        print("⏳ 提取音訊為 WAV 格式...")
         temp_wav_path = extract_audio_to_wav(video_file)
         
         if temp_wav_path:
             try:
-                print("載入說話者分離模型...")
+                print("⏳ 載入說話者分離模型（首次使用需下載，約 200 MB）...")
                 
                 # 設定執行緒數（使用所有效能核心）
                 torch.set_num_threads(8)
@@ -171,8 +177,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                     "pyannote/speaker-diarization-3.1",
                     token=hf_token
                 )
+                print("✓ 模型載入完成")
                 
                 # 嘗試使用 MPS (Metal Performance Shaders) GPU
+                print("⏳ 初始化 GPU/CPU 設備...")
                 if use_gpu and torch.backends.mps.is_available():
                     device = torch.device("mps")
                     print("✓ 使用 MPS GPU 加速")
@@ -182,8 +190,9 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 
                 if hasattr(pipeline, 'to'):
                     pipeline.to(device)
+                    print("✓ 模型已載入至設備")
                 
-                print("執行說話者分離...")
+                print("⏳ 執行說話者分離（這可能需要 1-2 分鐘）...")
                 print("提示：使用 GPU 可加速 2-3 倍")
                 
                 # 使用 hook 顯示進度
@@ -241,7 +250,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
         print("[2/2] 跳過說話者分離")
 
     # Step 3: 合併結果
-    print("合併轉錄結果...")
+    print(f"⏳ 合併轉錄結果（共 {len(segments)} 個段落）...")
     all_segments = []
 
     for i, segment in enumerate(segments, 1):
@@ -261,9 +270,11 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
             'speaker': speaker,
             'text': segment['text'].strip()
         })
+    
+    print("✓ 合併完成")
 
     # Step 4: 寫入檔案
-    print(f"寫入檔案: {output_file} (格式: {output_format.upper()})")
+    print(f"⏳ 寫入檔案: {output_file} (格式: {output_format.upper()})...")
     
     with open(output_file, "w", encoding="utf-8") as f:
         if output_format == "srt":
@@ -279,8 +290,11 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 timestamp = f"{format_timestamp(seg['start'])} --> {format_timestamp(seg['end'])}"
                 f.write(f"[{seg['speaker']}] {timestamp}\n")
                 f.write(f"{seg['text']}\n\n")
+    
+    print("✓ 檔案寫入完成")
 
     # 統計
+    print("⏳ 計算統計資訊...")
     total_duration = all_segments[-1]['end'] if all_segments else 0
     speakers = set(seg['speaker'] for seg in all_segments)
     
