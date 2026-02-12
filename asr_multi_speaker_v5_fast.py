@@ -34,7 +34,7 @@ def timestamp():
 
 def tprint(msg):
     """帶時間戳記的 print"""
-    tprint(f"[{timestamp()}] {msg}")
+    print(f"[{timestamp()}] {msg}")
 
 def format_timestamp(seconds):
     """將秒數轉換為時間格式"""
