@@ -329,9 +329,23 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     if total_duration > 0:
         speed_ratio = elapsed_time / total_duration
         realtime_speed = 1 / speed_ratio
+        
+        # 計算各階段的處理速度
+        asr_time = stage_times.get('asr', 0)
+        diarization_time = stage_times.get('diarization', 0)
+        
+        asr_speed_ratio = asr_time / total_duration if total_duration > 0 else 0
+        asr_realtime_speed = 1 / asr_speed_ratio if asr_speed_ratio > 0 else 0
+        
+        diarization_speed_ratio = diarization_time / total_duration if total_duration > 0 else 0
+        diarization_realtime_speed = 1 / diarization_speed_ratio if diarization_speed_ratio > 0 else 0
     else:
         speed_ratio = 0
         realtime_speed = 0
+        asr_speed_ratio = 0
+        asr_realtime_speed = 0
+        diarization_speed_ratio = 0
+        diarization_realtime_speed = 0
 
     tprint("=" * 60)
     tprint("✓ 處理完成！")
@@ -339,11 +353,19 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     tprint("📊 處理統計：")
     tprint(f"  • 影片時長: {format_timestamp(total_duration)}")
     tprint(f"  • 總處理時間: {int(elapsed_time // 60)} 分 {int(elapsed_time % 60)} 秒")
-    tprint(f"  • 處理速度: {speed_ratio:.2f}x 處理時間 = {realtime_speed:.2f}x 即時速度" if speed_ratio > 0 else "  • 處理速度: N/A")
+    tprint(f"  • 整體速度: {speed_ratio:.2f}x 處理時間 = {realtime_speed:.2f}x 即時速度" if speed_ratio > 0 else "  • 整體速度: N/A")
     tprint("")
-    tprint("⏱️  各階段耗時：")
-    tprint(f"  • ASR 轉錄: {int(stage_times.get('asr', 0))} 秒 ({stage_times.get('asr', 0) / elapsed_time * 100:.1f}%)")
-    tprint(f"  • 說話者分離: {int(stage_times.get('diarization', 0))} 秒 ({stage_times.get('diarization', 0) / elapsed_time * 100:.1f}%)")
+    tprint("⏱️  各階段耗時與速度：")
+    if asr_realtime_speed > 0:
+        tprint(f"  • ASR 轉錄: {int(stage_times.get('asr', 0))} 秒 ({stage_times.get('asr', 0) / elapsed_time * 100:.1f}%) - {asr_realtime_speed:.2f}x 即時速度")
+    else:
+        tprint(f"  • ASR 轉錄: {int(stage_times.get('asr', 0))} 秒 ({stage_times.get('asr', 0) / elapsed_time * 100:.1f}%)")
+    
+    if diarization_realtime_speed > 0:
+        tprint(f"  • 說話者分離: {int(stage_times.get('diarization', 0))} 秒 ({stage_times.get('diarization', 0) / elapsed_time * 100:.1f}%) - {diarization_realtime_speed:.2f}x 即時速度")
+    else:
+        tprint(f"  • 說話者分離: {int(stage_times.get('diarization', 0))} 秒 ({stage_times.get('diarization', 0) / elapsed_time * 100:.1f}%)")
+    
     tprint(f"  • 其他處理: {int(elapsed_time - stage_times.get('asr', 0) - stage_times.get('diarization', 0))} 秒")
     tprint("")
     tprint(f"📝 輸出結果：")
