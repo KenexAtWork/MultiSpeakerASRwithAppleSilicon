@@ -8,6 +8,16 @@
 
 set -e
 
+# 時間戳記函數
+timestamp() {
+    date '+%H:%M:%S.%3N'
+}
+
+# 帶時間戳記的 echo
+techo() {
+    echo "[$(timestamp)] $*"
+}
+
 # 取得腳本的實際路徑（處理符號連結，macOS 相容）
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [ -L "$SCRIPT_PATH" ]; do
@@ -27,7 +37,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     set -a  # 自動 export 所有變數
     source "$SCRIPT_DIR/.env"
     set +a  # 關閉自動 export
-    echo "✓ 已載入 .env 檔案"
+    techo "✓ 已載入 .env 檔案"
 fi
 
 # 檢查虛擬環境是否存在
@@ -143,10 +153,10 @@ if [[ "$HAS_TOKEN" == false ]]; then
 fi
 
 # 執行 Python 腳本
-echo "執行 ASR 轉錄..."
-echo "當前目錄: $(pwd)"
-echo "輸入檔案: $INPUT_FILE"
+techo "執行 ASR 轉錄..."
+techo "當前目錄: $(pwd)"
+techo "輸入檔案: $INPUT_FILE"
 echo ""
-echo "⏳ 啟動 Python 環境並載入模組..."
+techo "⏳ 啟動 Python 環境並載入模組..."
 
 python "$PYTHON_SCRIPT" "${ARGS[@]}"

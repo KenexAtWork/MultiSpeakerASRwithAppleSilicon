@@ -180,7 +180,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
         
         if temp_wav_path:
             try:
-                print("⏳ 載入說話者分離模型（首次使用需下載，約 200 MB）...")
+                tprint("⏳ 載入說話者分離模型（首次使用需下載，約 200 MB）...")
                 
                 # 設定執行緒數（使用所有效能核心）
                 torch.set_num_threads(8)
@@ -189,23 +189,23 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                     "pyannote/speaker-diarization-3.1",
                     token=hf_token
                 )
-                print("✓ 模型載入完成")
+                tprint("✓ 模型載入完成")
                 
                 # 嘗試使用 MPS (Metal Performance Shaders) GPU
-                print("⏳ 初始化 GPU/CPU 設備...")
+                tprint("⏳ 初始化 GPU/CPU 設備...")
                 if use_gpu and torch.backends.mps.is_available():
                     device = torch.device("mps")
-                    print("✓ 使用 MPS GPU 加速")
+                    tprint("✓ 使用 MPS GPU 加速")
                 else:
                     device = torch.device("cpu")
-                    print("✓ 使用 CPU 模式")
+                    tprint("✓ 使用 CPU 模式")
                 
                 if hasattr(pipeline, 'to'):
                     pipeline.to(device)
-                    print("✓ 模型已載入至設備")
+                    tprint("✓ 模型已載入至設備")
                 
-                print("⏳ 執行說話者分離（這可能需要 1-2 分鐘）...")
-                print("提示：使用 GPU 可加速 2-3 倍")
+                tprint("⏳ 執行說話者分離（這可能需要 1-2 分鐘）...")
+                tprint("提示：使用 GPU 可加速 2-3 倍")
                 
                 # 使用 hook 顯示進度
                 from pyannote.audio.pipelines.utils.hook import ProgressHook
@@ -225,7 +225,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                     raise Exception(f"無法從 {type(diarization_result)} 提取說話者資訊")
                 
                 num_speakers = len(set(sp['speaker'] for sp in speaker_timeline))
-                print(f"✓ 偵測到 {num_speakers} 位說話者")
+                tprint(f"✓ 偵測到 {num_speakers} 位說話者")
                 
                 # 立即釋放說話者分離模型記憶體
                 del pipeline
@@ -240,10 +240,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 if use_gpu and torch.backends.mps.is_available():
                     torch.mps.empty_cache()
                 
-                print("✓ 已釋放說話者分離模型記憶體")
+                tprint("✓ 已釋放說話者分離模型記憶體")
                 
             except Exception as e:
-                print(f"⚠ 說話者分離失敗: {str(e)}")
+                tprint(f"⚠ 說話者分離失敗: {str(e)}")
                 speaker_timeline = []
                 # 確保即使失敗也清理記憶體
                 import gc
@@ -253,11 +253,11 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 if temp_wav_path and os.path.exists(temp_wav_path):
                     try:
                         os.unlink(temp_wav_path)
-                        print("✓ 已清理臨時音訊檔案")
+                        tprint("✓ 已清理臨時音訊檔案")
                     except:
                         pass
         else:
-            print("⚠ 無法提取音訊，將不標記說話者")
+            tprint("⚠ 無法提取音訊，將不標記說話者")
     else:
         tprint("[2/2] 跳過說話者分離")
 
