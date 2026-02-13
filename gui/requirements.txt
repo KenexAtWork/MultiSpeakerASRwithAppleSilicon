@@ -1,0 +1,9 @@
+# GUI 相關套件
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+PyQt6-sip>=13.6.0
+
+# ASR 相關套件（繼承自主專案）
+mlx-whisper
+pyannote-audio
+torch

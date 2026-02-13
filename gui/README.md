@@ -1,0 +1,149 @@
+# ASR Multi-Speaker Transcription - GUI 版本
+
+使用 PyQt6 建立的圖形界面版本。
+
+## 功能特色
+
+- ✅ 拖放檔案支援
+- ✅ 即時處理進度顯示
+- ✅ 處理日誌即時更新
+- ✅ 支援多種語言和模型選擇
+- ✅ 可選擇輸出格式（SRT/TXT）
+- ✅ 背景處理，UI 不凍結
+
+## 安裝
+
+### 1. 安裝 PyQt6
+
+```bash
+# 在虛擬環境中安裝
+source ../.venv/bin/activate
+pip install PyQt6
+```
+
+### 2. 確認環境變數
+
+確保已設定 `HF_TOKEN`：
+
+```bash
+export HF_TOKEN=your_huggingface_token_here
+```
+
+或在 `.env` 檔案中設定。
+
+## 使用方式
+
+### 啟動 GUI
+
+```bash
+# 從 gui 目錄啟動
+cd gui
+python main.py
+
+# 或從 asr 目錄啟動
+python gui/main.py
+```
+
+### 使用步驟
+
+1. **選擇檔案**
+   - 拖放影片檔案到視窗中
+   - 或點擊「選擇檔案」按鈕
+
+2. **設定參數**
+   - 選擇語言（中文/英文/日文/自動）
+   - 選擇模型大小（tiny/base/small/medium/large）
+   - 選擇輸出格式（SRT/TXT）
+   - 可選：跳過說話者分離
+   - 可選：停用 GPU 加速
+
+3. **開始處理**
+   - 點擊「開始轉錄」按鈕
+   - 觀察進度條和日誌輸出
+   - 等待處理完成
+
+4. **查看結果**
+   - 處理完成後會顯示通知
+   - 點擊「開啟輸出資料夾」查看結果
+
+## 專案結構
+
+```
+gui/
+├── main.py              # 主程式入口
+├── ui/
+│   ├── __init__.py
+│   └── main_window.py   # 主視窗 UI
+├── core/
+│   ├── __init__.py
+│   └── asr_worker.py    # 背景處理 Worker
+├── utils/
+│   └── __init__.py
+├── resources/           # 資源檔案（圖示等）
+├── requirements.txt     # Python 套件需求
+└── README.md           # 本檔案
+```
+
+## 技術細節
+
+### 架構
+
+- **PyQt6**: 跨平台 GUI 框架
+- **QThread**: 背景執行 ASR，避免 UI 凍結
+- **Signal/Slot**: 更新進度和日誌
+- **拖放支援**: QDragDrop 實作
+
+### 關鍵組件
+
+1. **MainWindow** (`ui/main_window.py`)
+   - 主視窗 UI
+   - 處理用戶互動
+   - 顯示進度和日誌
+
+2. **ASRWorker** (`core/asr_worker.py`)
+   - 在背景執行緒中執行 ASR
+   - 發送進度和日誌信號
+   - 處理錯誤
+
+3. **DropZone** (`ui/main_window.py`)
+   - 自定義拖放區域
+   - 支援拖放檔案
+
+## 未來改進
+
+- [ ] 批次處理多個檔案
+- [ ] 儲存和載入設定
+- [ ] 處理歷史記錄
+- [ ] 更詳細的進度顯示（各階段進度）
+- [ ] 支援取消處理
+- [ ] 打包成 .app（使用 py2app）
+- [ ] 支援更多輸出格式
+- [ ] 預覽轉錄結果
+
+## 打包成 macOS App
+
+（待實作）
+
+```bash
+# 使用 py2app 打包
+pip install py2app
+python setup.py py2app
+```
+
+## 疑難排解
+
+### 問題：找不到 asr_multi_speaker_v5_fast 模組
+
+確保從正確的目錄啟動，或檢查 `sys.path` 設定。
+
+### 問題：UI 凍結
+
+確認 ASR 處理是在 QThread 中執行，而非主執行緒。
+
+### 問題：無法拖放檔案
+
+檢查 `setAcceptDrops(True)` 是否正確設定。
+
+## 授權
+
+MIT License
