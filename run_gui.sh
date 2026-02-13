@@ -24,32 +24,27 @@ else
     echo ""
 fi
 
-# 檢查必要套件
+# 檢查必要套件（使用 pip list 避免 import 時的初始化延遲）
 echo "檢查必要套件..."
 
-# 檢查 mlx-whisper
-if ! python -c "import mlx_whisper" 2>/dev/null; then
-    echo "❌ 缺少 mlx-whisper"
-    echo "請執行: pip install mlx-whisper"
-    exit 1
+MISSING_PACKAGES=()
+
+if ! python -m pip list 2>/dev/null | grep -q "mlx-whisper"; then
+    MISSING_PACKAGES+=("mlx-whisper")
 fi
 
-# 檢查 pyannote
-if ! python -c "import pyannote.audio" 2>/dev/null; then
-    echo "❌ 缺少 pyannote-audio"
-    echo "請執行: pip install pyannote-audio"
-    exit 1
+if ! python -m pip list 2>/dev/null | grep -q "pyannote.audio"; then
+    MISSING_PACKAGES+=("pyannote-audio")
 fi
 
-# 檢查 PyQt6
-if ! python -c "import PyQt6" 2>/dev/null; then
-    echo "⚠️  缺少 PyQt6，正在安裝..."
-    pip install PyQt6
-    if [ $? -ne 0 ]; then
-        echo "❌ PyQt6 安裝失敗"
-        exit 1
-    fi
-    echo "✓ PyQt6 安裝完成"
+if ! python -m pip list 2>/dev/null | grep -q "PyQt6"; then
+    MISSING_PACKAGES+=("PyQt6")
+fi
+
+if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
+    echo "❌ 缺少以下套件: ${MISSING_PACKAGES[*]}"
+    echo "請執行: python -m pip install ${MISSING_PACKAGES[*]}"
+    exit 1
 fi
 
 echo "✓ 所有套件已就緒"

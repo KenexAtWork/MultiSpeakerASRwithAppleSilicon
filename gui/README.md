@@ -11,46 +11,44 @@
 - ✅ 可選擇輸出格式（SRT/TXT）
 - ✅ 背景處理，UI 不凍結
 
+## 系統需求
+
+- macOS（支援 Apple Silicon M1/M2/M3）
+- Python 3.10（重要：PyQt6 目前不支援 Python 3.11+）
+- 16GB RAM（建議）
+
 ## 安裝
 
-GUI 版本可以在任何 Python 環境中運行，不一定需要 `uv`。
-
-### 方式 1：使用現有虛擬環境
-
-如果你已經有 Python 虛擬環境（`.venv` 或 `venv`）：
+### 快速開始（推薦）
 
 ```bash
-# 啟動虛擬環境
-source .venv/bin/activate  # 或 source venv/bin/activate
+# 1. 建立 Python 3.10 虛擬環境
+python3.10 -m venv .venv
 
-# 安裝 PyQt6
-pip install PyQt6
-
-# 啟動 GUI
-./run_gui.sh
-```
-
-### 方式 2：使用 uv（推薦）
-
-```bash
-# 建立虛擬環境
-uv venv --python /opt/homebrew/bin/python3
-
-# 啟動環境
+# 2. 啟動虛擬環境
 source .venv/bin/activate
 
-# 安裝套件
-uv pip install mlx-whisper pyannote-audio PyQt6
+# 3. 安裝所有套件
+pip install mlx-whisper pyannote-audio PyQt6
 
-# 啟動 GUI
+# 4. 設定 Hugging Face Token
+cp .env.example .env
+# 編輯 .env 並填入你的 HF_TOKEN
+
+# 5. 啟動 GUI
 ./run_gui.sh
 ```
 
-### 方式 3：使用標準 venv
+### 詳細安裝步驟
+
+#### 方式 1：使用標準 venv（推薦）
 
 ```bash
+# 確認 Python 版本（必須是 3.10）
+python3.10 --version
+
 # 建立虛擬環境
-python3 -m venv .venv
+python3.10 -m venv .venv
 
 # 啟動環境
 source .venv/bin/activate
@@ -62,33 +60,46 @@ pip install mlx-whisper pyannote-audio PyQt6
 ./run_gui.sh
 ```
 
-### 方式 4：直接使用系統 Python（不推薦）
+#### 方式 2：使用 Homebrew Python 3.10
+
+如果系統沒有 Python 3.10：
 
 ```bash
-# 安裝套件到系統 Python
-pip3 install mlx-whisper pyannote-audio PyQt6
+# 安裝 Python 3.10
+brew install python@3.10
+
+# 建立虛擬環境
+/opt/homebrew/bin/python3.10 -m venv .venv
+
+# 啟動環境
+source .venv/bin/activate
+
+# 安裝套件
+pip install mlx-whisper pyannote-audio PyQt6
 
 # 啟動 GUI
-python3 gui/main.py
+./run_gui.sh
 ```
 
-### 1. 安裝 PyQt6
+#### 重要提醒
 
-```bash
-# 在虛擬環境中安裝
-source ../.venv/bin/activate
-pip install PyQt6
-```
+- PyQt6 目前僅支援 Python 3.10，不支援 3.11 或更新版本
+- 如果遇到 `ModuleNotFoundError: No module named 'PyQt6'`，請確認：
+  1. 虛擬環境已正確啟動
+  2. PyQt6 已安裝在虛擬環境中（不是系統 Python）
+  3. Python 版本是 3.10
 
-### 2. 確認環境變數
+### 環境變數設定
 
 確保已設定 `HF_TOKEN`：
 
 ```bash
-export HF_TOKEN=your_huggingface_token_here
-```
+# 複製範例檔案
+cp .env.example .env
 
-或在 `.env` 檔案中設定。
+# 編輯 .env 並填入你的 token
+# HF_TOKEN=your_huggingface_token_here
+```
 
 ## 使用方式
 

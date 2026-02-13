@@ -3,12 +3,13 @@ ASR Worker - 在背景執行緒中處理 ASR 轉錄
 """
 import os
 import sys
+import io
+from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
-# 導入 ASR 模組
+# 導入 ASR 模組（延遲導入以加快 GUI 啟動）
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from asr_multi_speaker_v5_fast import transcribe_with_speakers
 
 
 class ASRWorker(QThread):
@@ -35,63 +36,64 @@ class ASRWorker(QThread):
         
         # 取得 HF_TOKEN
         self.hf_token = os.environ.get('HF_TOKEN')
-        
-        # 重定向 print 輸出
-        self._setup_print_redirect()
-    
-    def _setup_print_redirect(self):
-        """設定 print 重定向到信號"""
-        import builtins
-        original_print = builtins.print
-        
-        def custom_print(*args, **kwargs):
-            # 將 print 內容轉為字串
-            message = ' '.join(str(arg) for arg in args)
-            
-            # 發送到 GUI
-            self.log_message.emit(message)
-            
-            # 也輸出到原始 stdout
-            original_print(*args, **kwargs)
-        
-        builtins.print = custom_print
     
     def run(self):
         """執行 ASR 處理"""
         try:
+            # 延遲導入以加快 GUI 啟動
+            from asr_multi_speaker_v5_fast import transcribe_with_speakers
+            
             self.log_message.emit("=" * 60)
             self.log_message.emit("開始處理...")
             self.log_message.emit(f"輸入檔案: {self.video_file}")
             self.log_message.emit(f"輸出檔案: {self.output_file}")
             self.log_message.emit(f"語言: {self.language}")
             self.log_message.emit(f"模型: {self.model_size}")
+            self.log_message.emit(f"輸出格式: {self.output_format}")
+            self.log_message.emit(f"跳過說話者分離: {self.skip_diarization}")
+            self.log_message.emit(f"使用 GPU: {self.use_gpu}")
             self.log_message.emit("=" * 60)
             
-            # 階段 1: ASR 轉錄
-            self.stage_changed.emit("載入模型...")
+            # 階段 1: 準備
+            self.stage_changed.emit("準備處理...")
+            self.progress.emit(5)
+            
+            # 階段 2: ASR 轉錄
+            self.stage_changed.emit("ASR 轉錄中...")
             self.progress.emit(10)
             
-            self.stage_changed.emit("ASR 轉錄中...")
-            self.progress.emit(20)
+            # 捕獲標準輸出並轉發到 GUI
+            output_buffer = io.StringIO()
             
-            # 執行轉錄
-            # 注意：這裡需要修改 transcribe_with_speakers 來支援進度回調
-            # 目前先簡單執行
-            transcribe_with_speakers(
-                video_file=self.video_file,
-                output_file=self.output_file,
-                language=self.language,
-                hf_token=self.hf_token,
-                skip_diarization=self.skip_diarization,
-                use_gpu=self.use_gpu,
-                output_format=self.output_format,
-                model_size=self.model_size
-            )
+            # 執行轉錄（stdout 會被捕獲）
+            with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
+                transcribe_with_speakers(
+                    video_file=self.video_file,
+                    output_file=self.output_file,
+                    language=self.language,
+                    hf_token=self.hf_token,
+                    skip_diarization=self.skip_diarization,
+                    use_gpu=self.use_gpu,
+                    output_format=self.output_format,
+                    model_size=self.model_size
+                )
+            
+            # 取得輸出並發送到 GUI
+            output = output_buffer.getvalue()
+            if output:
+                for line in output.split('\n'):
+                    if line.strip():
+                        self.log_message.emit(line)
             
             self.progress.emit(100)
+            self.stage_changed.emit("處理完成！")
+            self.log_message.emit("=" * 60)
+            self.log_message.emit(f"✓ 輸出檔案: {self.output_file}")
+            self.log_message.emit("=" * 60)
             self.finished.emit(self.output_file)
             
         except Exception as e:
             import traceback
-            error_msg = f"{str(e)}\n\n{traceback.format_exc()}"
+            error_msg = f"錯誤: {str(e)}\n\n詳細資訊:\n{traceback.format_exc()}"
+            self.log_message.emit(error_msg)
             self.error.emit(error_msg)
