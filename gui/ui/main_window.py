@@ -313,8 +313,12 @@ class MainWindow(QMainWindow):
     
     def on_log_message(self, message):
         """添加日誌訊息"""
-        # QPlainTextEdit 的 appendPlainText 是線程安全的
-        self.log_text.appendPlainText(message)
+        # 使用 insertPlainText 配合 moveCursor 更安全
+        self.log_text.moveCursor(self.log_text.textCursor().MoveOperation.End)
+        self.log_text.insertPlainText(message + '\n')
+        # 確保捲動到底部
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
     
     def on_finished(self, output_file):
         """處理完成"""
