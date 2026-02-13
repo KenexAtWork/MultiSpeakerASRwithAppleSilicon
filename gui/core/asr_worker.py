@@ -3,8 +3,7 @@ ASR Worker - 在背景執行緒中處理 ASR 轉錄
 """
 import os
 import sys
-import io
-from contextlib import redirect_stdout, redirect_stderr
+import builtins
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -39,6 +38,19 @@ class ASRWorker(QThread):
     
     def run(self):
         """執行 ASR 處理"""
+        # 保存原始的 print 函數
+        original_print = builtins.print
+        
+        # 創建自定義 print 函數（避免遞迴）
+        def gui_print(*args, sep=' ', end='\n', file=None, flush=False):
+            # 只處理輸出到 stdout 的 print
+            if file is None or file == sys.stdout:
+                message = sep.join(str(arg) for arg in args)
+                if message.strip():  # 只發送非空訊息
+                    self.log_message.emit(message)
+            # 仍然輸出到原始 stdout（用於調試）
+            original_print(*args, sep=sep, end=end, file=file, flush=flush)
+        
         try:
             # 延遲導入以加快 GUI 啟動
             from asr_multi_speaker_v5_fast import transcribe_with_speakers
@@ -62,28 +74,20 @@ class ASRWorker(QThread):
             self.stage_changed.emit("ASR 轉錄中...")
             self.progress.emit(10)
             
-            # 捕獲標準輸出並轉發到 GUI
-            output_buffer = io.StringIO()
+            # 替換 print 函數以實現即時輸出
+            builtins.print = gui_print
             
-            # 執行轉錄（stdout 會被捕獲）
-            with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
-                transcribe_with_speakers(
-                    video_file=self.video_file,
-                    output_file=self.output_file,
-                    language=self.language,
-                    hf_token=self.hf_token,
-                    skip_diarization=self.skip_diarization,
-                    use_gpu=self.use_gpu,
-                    output_format=self.output_format,
-                    model_size=self.model_size
-                )
-            
-            # 取得輸出並發送到 GUI
-            output = output_buffer.getvalue()
-            if output:
-                for line in output.split('\n'):
-                    if line.strip():
-                        self.log_message.emit(line)
+            # 執行轉錄
+            transcribe_with_speakers(
+                video_file=self.video_file,
+                output_file=self.output_file,
+                language=self.language,
+                hf_token=self.hf_token,
+                skip_diarization=self.skip_diarization,
+                use_gpu=self.use_gpu,
+                output_format=self.output_format,
+                model_size=self.model_size
+            )
             
             self.progress.emit(100)
             self.stage_changed.emit("處理完成！")
@@ -97,3 +101,7 @@ class ASRWorker(QThread):
             error_msg = f"錯誤: {str(e)}\n\n詳細資訊:\n{traceback.format_exc()}"
             self.log_message.emit(error_msg)
             self.error.emit(error_msg)
+        
+        finally:
+            # 恢復原始的 print 函數
+            builtins.print = original_print

@@ -3,7 +3,7 @@
 """
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QLabel, QComboBox, QCheckBox, QTextEdit,
+    QPushButton, QLabel, QComboBox, QCheckBox, QPlainTextEdit,
     QProgressBar, QFileDialog, QGroupBox, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -210,19 +210,17 @@ class MainWindow(QMainWindow):
         # 日誌區域
         log_group = QGroupBox("處理日誌")
         log_layout = QVBoxLayout()
-        self.log_text = QTextEdit()
+        self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMaximumHeight(200)
         self.log_text.setStyleSheet("""
-            QTextEdit {
+            QPlainTextEdit {
                 background-color: #2b2b2b;
                 color: #f0f0f0;
                 font-family: 'Monaco', 'Menlo', 'Courier New';
                 font-size: 11px;
             }
         """)
-        # 設定為純文字模式以避免 QTextCursor 問題
-        self.log_text.setAcceptRichText(False)
         log_layout.addWidget(self.log_text)
         log_group.setLayout(log_layout)
         layout.addWidget(log_group)
@@ -315,13 +313,8 @@ class MainWindow(QMainWindow):
     
     def on_log_message(self, message):
         """添加日誌訊息"""
-        # 使用 insertPlainText 而不是 append 以避免 QTextCursor 問題
-        cursor = self.log_text.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        cursor.insertText(message + '\n')
-        self.log_text.setTextCursor(cursor)
-        # 自動捲動到底部
-        self.log_text.ensureCursorVisible()
+        # QPlainTextEdit 的 appendPlainText 是線程安全的
+        self.log_text.appendPlainText(message)
     
     def on_finished(self, output_file):
         """處理完成"""
