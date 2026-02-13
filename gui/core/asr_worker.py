@@ -1,14 +1,12 @@
 """
 ASR Worker - 在背景執行緒中處理 ASR 轉錄
+使用 subprocess 執行，完全隔離避免 Qt 線程衝突
 """
 import os
 import sys
-import builtins
+import subprocess
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
-
-# 導入 ASR 模組（延遲導入以加快 GUI 啟動）
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 class ASRWorker(QThread):
@@ -34,27 +32,11 @@ class ASRWorker(QThread):
         self.use_gpu = use_gpu
         
         # 取得 HF_TOKEN
-        self.hf_token = os.environ.get('HF_TOKEN')
+        self.hf_token = os.environ.get('HF_TOKEN', '')
     
     def run(self):
-        """執行 ASR 處理"""
-        # 保存原始的 print 函數
-        original_print = builtins.print
-        
-        # 創建自定義 print 函數（避免遞迴）
-        def gui_print(*args, sep=' ', end='\n', file=None, flush=False):
-            # 只處理輸出到 stdout 的 print
-            if file is None or file == sys.stdout:
-                message = sep.join(str(arg) for arg in args)
-                if message.strip():  # 只發送非空訊息
-                    self.log_message.emit(message)
-            # 仍然輸出到原始 stdout（用於調試）
-            original_print(*args, sep=sep, end=end, file=file, flush=flush)
-        
+        """執行 ASR 處理（透過 subprocess）"""
         try:
-            # 延遲導入以加快 GUI 啟動
-            from asr_multi_speaker_v5_fast import transcribe_with_speakers
-            
             self.log_message.emit("=" * 60)
             self.log_message.emit("開始處理...")
             self.log_message.emit(f"輸入檔案: {self.video_file}")
@@ -66,42 +48,88 @@ class ASRWorker(QThread):
             self.log_message.emit(f"使用 GPU: {self.use_gpu}")
             self.log_message.emit("=" * 60)
             
-            # 階段 1: 準備
-            self.stage_changed.emit("準備處理...")
-            self.progress.emit(5)
-            
-            # 階段 2: ASR 轉錄
             self.stage_changed.emit("ASR 轉錄中...")
             self.progress.emit(10)
             
-            # 替換 print 函數以實現即時輸出
-            builtins.print = gui_print
+            # 找到 Python 執行檔和腳本路徑
+            python_exe = sys.executable
+            asr_dir = str(Path(__file__).parent.parent.parent)
+            script = str(Path(asr_dir) / 'asr_multi_speaker_v5_fast.py')
             
-            # 執行轉錄
-            transcribe_with_speakers(
-                video_file=self.video_file,
-                output_file=self.output_file,
-                language=self.language,
-                hf_token=self.hf_token,
-                skip_diarization=self.skip_diarization,
-                use_gpu=self.use_gpu,
-                output_format=self.output_format,
-                model_size=self.model_size
+            # 組裝命令
+            cmd = [
+                python_exe, script,
+                '--input', self.video_file,
+                '--output', self.output_file,
+                '--language', self.language,
+                '--format', self.output_format,
+                '--model', self.model_size,
+            ]
+            if self.skip_diarization:
+                cmd.append('--skip-diarization')
+            if not self.use_gpu:
+                cmd.append('--no-gpu')
+            
+            # 設定環境變數
+            env = os.environ.copy()
+            if self.hf_token:
+                env['HF_TOKEN'] = self.hf_token
+            # 強制 Python 不緩衝輸出
+            env['PYTHONUNBUFFERED'] = '1'
+            
+            # 使用 subprocess 執行，逐行讀取輸出
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                env=env,
+                cwd=asr_dir,
             )
             
-            self.progress.emit(100)
-            self.stage_changed.emit("處理完成！")
-            self.log_message.emit("=" * 60)
-            self.log_message.emit(f"✓ 輸出檔案: {self.output_file}")
-            self.log_message.emit("=" * 60)
-            self.finished.emit(self.output_file)
+            # 即時讀取輸出
+            for line in process.stdout:
+                line = line.rstrip('\n')
+                if line:
+                    self.log_message.emit(line)
+                    # 根據輸出內容更新進度
+                    self._update_progress(line)
+            
+            process.wait()
+            
+            if process.returncode == 0:
+                self.progress.emit(100)
+                self.stage_changed.emit("處理完成！")
+                self.log_message.emit("=" * 60)
+                self.log_message.emit(f"✓ 輸出檔案: {self.output_file}")
+                self.log_message.emit("=" * 60)
+                self.finished.emit(self.output_file)
+            else:
+                self.error.emit(f"處理失敗（exit code: {process.returncode}）")
             
         except Exception as e:
             import traceback
-            error_msg = f"錯誤: {str(e)}\n\n詳細資訊:\n{traceback.format_exc()}"
+            error_msg = f"錯誤: {str(e)}\n\n{traceback.format_exc()}"
             self.log_message.emit(error_msg)
             self.error.emit(error_msg)
-        
-        finally:
-            # 恢復原始的 print 函數
-            builtins.print = original_print
+    
+    def _update_progress(self, line):
+        """根據輸出內容更新進度和階段"""
+        if '載入 Whisper 模型' in line:
+            self.stage_changed.emit("載入 ASR 模型...")
+            self.progress.emit(15)
+        elif '開始轉錄' in line:
+            self.stage_changed.emit("ASR 轉錄中...")
+            self.progress.emit(30)
+        elif '執行說話者分離' in line:
+            self.stage_changed.emit("說話者分離中...")
+            self.progress.emit(60)
+        elif '合併轉錄結果' in line:
+            self.stage_changed.emit("合併結果...")
+            self.progress.emit(85)
+        elif '寫入檔案' in line:
+            self.stage_changed.emit("寫入檔案...")
+            self.progress.emit(90)
+        elif '處理完成' in line:
+            self.progress.emit(95)
