@@ -2,6 +2,27 @@
 
 使用 MLX Whisper 和 pyannote.audio 進行語音轉錄和說話者分離的工具，針對 Apple Silicon (M1/M2/M3) Mac 優化。
 
+## 🎯 使用方式
+
+### 圖形界面版本（推薦）
+
+```bash
+# 啟動 GUI 應用
+./run_gui.sh
+```
+
+提供友善的圖形界面，支援拖放檔案、即時進度顯示等功能。詳見 [GUI 使用說明](gui/README.md)。
+
+### 命令列版本
+
+```bash
+# 基本使用
+./asr.sh video.mp4
+
+# 指定模型大小
+./asr.sh video.mp4 --model small
+```
+
 ## 功能特色
 
 - ✅ 使用 MLX Whisper 進行高效能 ASR 轉錄（Apple Silicon 原生加速）
@@ -10,6 +31,7 @@
 - ✅ 多執行緒優化，充分利用 M1/M2/M3 效能核心
 - ✅ 自動處理影片音訊提取
 - ✅ 支援多種語言（中文、英文、日文等）
+- ✅ 圖形界面版本（PyQt6）- 拖放檔案、即時進度、日誌顯示
 
 ## 系統需求
 
@@ -51,6 +73,9 @@ source .venv/bin/activate
 
 # 安裝 Python 套件
 uv pip install mlx-whisper pyannote-audio
+
+# （可選）安裝 GUI 版本所需套件
+pip install PyQt6
 ```
 
 #### 3. 設定 Hugging Face Token
