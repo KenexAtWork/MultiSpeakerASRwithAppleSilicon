@@ -13,6 +13,65 @@
 
 ## 安裝
 
+GUI 版本可以在任何 Python 環境中運行，不一定需要 `uv`。
+
+### 方式 1：使用現有虛擬環境
+
+如果你已經有 Python 虛擬環境（`.venv` 或 `venv`）：
+
+```bash
+# 啟動虛擬環境
+source .venv/bin/activate  # 或 source venv/bin/activate
+
+# 安裝 PyQt6
+pip install PyQt6
+
+# 啟動 GUI
+./run_gui.sh
+```
+
+### 方式 2：使用 uv（推薦）
+
+```bash
+# 建立虛擬環境
+uv venv --python /opt/homebrew/bin/python3
+
+# 啟動環境
+source .venv/bin/activate
+
+# 安裝套件
+uv pip install mlx-whisper pyannote-audio PyQt6
+
+# 啟動 GUI
+./run_gui.sh
+```
+
+### 方式 3：使用標準 venv
+
+```bash
+# 建立虛擬環境
+python3 -m venv .venv
+
+# 啟動環境
+source .venv/bin/activate
+
+# 安裝套件
+pip install mlx-whisper pyannote-audio PyQt6
+
+# 啟動 GUI
+./run_gui.sh
+```
+
+### 方式 4：直接使用系統 Python（不推薦）
+
+```bash
+# 安裝套件到系統 Python
+pip3 install mlx-whisper pyannote-audio PyQt6
+
+# 啟動 GUI
+python3 gui/main.py
+```
+
 ### 1. 安裝 PyQt6
 
 ```bash
