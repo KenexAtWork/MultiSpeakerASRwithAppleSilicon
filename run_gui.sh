@@ -16,15 +16,14 @@ elif [ -d "venv" ]; then
     echo "✓ 使用 venv 虛擬環境"
     source venv/bin/activate
 else
-    echo "⚠️  未找到虛擬環境，使用系統 Python"
-    echo "建議建立虛擬環境："
-    echo "  python3 -m venv .venv"
-    echo "  或"
-    echo "  uv venv --python /opt/homebrew/bin/python3"
-    echo ""
+    echo "⚠️  未找到虛擬環境"
+    echo "請先建立虛擬環境："
+    echo "  uv venv --python 3.10"
+    echo "  source .venv/bin/activate"
+    exit 1
 fi
 
-# 檢查必要套件（使用 pip list 避免 import 時的初始化延遲）
+# 檢查必要套件，缺少則自動安裝
 echo "檢查必要套件..."
 
 MISSING_PACKAGES=()
@@ -42,9 +41,12 @@ if ! python -m pip list 2>/dev/null | grep -q "PyQt6"; then
 fi
 
 if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
-    echo "❌ 缺少以下套件: ${MISSING_PACKAGES[*]}"
-    echo "請執行: python -m pip install ${MISSING_PACKAGES[*]}"
-    exit 1
+    echo "⏳ 安裝缺少的套件: ${MISSING_PACKAGES[*]}"
+    if command -v uv &>/dev/null; then
+        uv pip install "${MISSING_PACKAGES[@]}"
+    else
+        python -m pip install "${MISSING_PACKAGES[@]}"
+    fi
 fi
 
 echo "✓ 所有套件已就緒"
