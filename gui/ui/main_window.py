@@ -136,66 +136,56 @@ class MainWindow(QMainWindow):
         settings_group = QGroupBox("設定")
         settings_layout = QVBoxLayout()
         
-        # 語言選擇
-        lang_layout = QHBoxLayout()
-        lang_layout.addWidget(QLabel("語言:"))
+        # 第一行：語言 + 模型 + 輸出格式
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("語言:"))
         self.language_combo = QComboBox()
         self.language_combo.addItems([
             "zh (中文)", "en (英文)", "ja (日文)", 
             "auto (自動偵測)"
         ])
-        lang_layout.addWidget(self.language_combo)
-        lang_layout.addStretch()
-        settings_layout.addLayout(lang_layout)
-        
-        # 模型選擇
-        model_layout = QHBoxLayout()
-        model_layout.addWidget(QLabel("模型大小:"))
+        row1.addWidget(self.language_combo)
+        row1.addSpacing(15)
+        row1.addWidget(QLabel("模型:"))
         self.model_combo = QComboBox()
         self.model_combo.addItems([
             "tiny (~1-2 GB)", "base (~2-3 GB)", 
             "small (~3-4 GB)", "medium (~5-7 GB)", 
             "large (~8-10 GB)"
         ])
-        self.model_combo.setCurrentIndex(3)  # 預設 medium
-        model_layout.addWidget(self.model_combo)
-        model_layout.addStretch()
-        settings_layout.addLayout(model_layout)
-        
-        # 輸出格式
-        format_layout = QHBoxLayout()
-        format_layout.addWidget(QLabel("輸出格式:"))
+        self.model_combo.setCurrentIndex(3)
+        row1.addWidget(self.model_combo)
+        row1.addSpacing(15)
+        row1.addWidget(QLabel("格式:"))
         self.format_combo = QComboBox()
         self.format_combo.addItems(["SRT", "TXT"])
-        format_layout.addWidget(self.format_combo)
-        format_layout.addStretch()
-        settings_layout.addLayout(format_layout)
+        row1.addWidget(self.format_combo)
+        row1.addStretch()
+        settings_layout.addLayout(row1)
         
-        # 選項
+        # 第二行：checkbox + HF Token
+        row2 = QHBoxLayout()
         self.skip_diarization_cb = QCheckBox("跳過說話者分離")
-        settings_layout.addWidget(self.skip_diarization_cb)
-        
-        self.use_gpu_cb = QCheckBox("使用 GPU 加速 (MPS)")
+        row2.addWidget(self.skip_diarization_cb)
+        self.use_gpu_cb = QCheckBox("GPU 加速")
         self.use_gpu_cb.setChecked(True)
-        settings_layout.addWidget(self.use_gpu_cb)
-        
-        # HF Token 輸入
-        token_layout = QHBoxLayout()
-        token_layout.addWidget(QLabel("HF Token:"))
+        row2.addWidget(self.use_gpu_cb)
+        row2.addSpacing(15)
+        row2.addWidget(QLabel("HF Token:"))
         self.hf_token_input = QLineEdit()
-        self.hf_token_input.setPlaceholderText("Hugging Face token（說話者分離需要）")
+        self.hf_token_input.setPlaceholderText("說話者分離需要")
         self.hf_token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.hf_token_input.setText(os.environ.get('HF_TOKEN', ''))
-        token_layout.addWidget(self.hf_token_input)
+        row2.addWidget(self.hf_token_input)
         self.toggle_token_btn = QPushButton("顯示")
         self.toggle_token_btn.setFixedWidth(50)
         self.toggle_token_btn.clicked.connect(self._toggle_token_visibility)
-        token_layout.addWidget(self.toggle_token_btn)
+        row2.addWidget(self.toggle_token_btn)
         self.save_token_btn = QPushButton("儲存")
         self.save_token_btn.setFixedWidth(50)
         self.save_token_btn.clicked.connect(self._save_hf_token)
-        token_layout.addWidget(self.save_token_btn)
-        settings_layout.addLayout(token_layout)
+        row2.addWidget(self.save_token_btn)
+        settings_layout.addLayout(row2)
         
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
