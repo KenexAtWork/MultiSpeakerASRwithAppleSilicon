@@ -54,8 +54,7 @@
 brew install ffmpeg
 
 # 安裝 uv（Python 套件管理工具）
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.cargo/env
+brew install uv
 ```
 
 #### 2. Clone 專案並建立環境
