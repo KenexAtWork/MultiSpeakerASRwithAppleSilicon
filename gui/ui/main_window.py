@@ -230,7 +230,7 @@ class MainWindow(QMainWindow):
         log_group = QGroupBox("處理日誌")
         log_layout = QVBoxLayout()
         self.log_list = QListWidget()
-        self.log_list.setMaximumHeight(200)
+        self.log_list.setMinimumHeight(300)
         self.log_list.setStyleSheet("""
             QListWidget {
                 background-color: #2b2b2b;
