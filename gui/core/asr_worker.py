@@ -65,6 +65,8 @@ class ASRWorker(QThread):
                 '--format', self.output_format,
                 '--model', self.model_size,
             ]
+            if self.hf_token:
+                cmd.extend(['--hf-token', self.hf_token])
             if self.skip_diarization:
                 cmd.append('--skip-diarization')
             if not self.use_gpu:
