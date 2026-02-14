@@ -26,17 +26,24 @@ fi
 # 檢查必要套件，缺少則自動安裝
 echo "檢查必要套件..."
 
+# 優先用 uv pip list，fallback 到 python -m pip list
+if command -v uv &>/dev/null; then
+    PIP_LIST=$(uv pip list 2>/dev/null)
+else
+    PIP_LIST=$(python -m pip list 2>/dev/null)
+fi
+
 MISSING_PACKAGES=()
 
-if ! python -m pip list 2>/dev/null | grep -q "mlx-whisper"; then
+if ! echo "$PIP_LIST" | grep -q "mlx-whisper"; then
     MISSING_PACKAGES+=("mlx-whisper")
 fi
 
-if ! python -m pip list 2>/dev/null | grep -q "pyannote.audio"; then
+if ! echo "$PIP_LIST" | grep -q "pyannote-audio"; then
     MISSING_PACKAGES+=("pyannote-audio")
 fi
 
-if ! python -m pip list 2>/dev/null | grep -q "PyQt6"; then
+if ! echo "$PIP_LIST" | grep -q "PyQt6"; then
     MISSING_PACKAGES+=("PyQt6")
 fi
 
