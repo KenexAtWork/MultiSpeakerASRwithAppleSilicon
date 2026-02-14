@@ -5,11 +5,13 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QComboBox, QCheckBox, QListWidget,
     QProgressBar, QFileDialog, QGroupBox, QMessageBox,
-    QScrollArea
+    QScrollArea, QLineEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont
 from pathlib import Path
+import os
+import re
 
 from core.asr_worker import ASRWorker
 
@@ -177,6 +179,24 @@ class MainWindow(QMainWindow):
         self.use_gpu_cb.setChecked(True)
         settings_layout.addWidget(self.use_gpu_cb)
         
+        # HF Token 輸入
+        token_layout = QHBoxLayout()
+        token_layout.addWidget(QLabel("HF Token:"))
+        self.hf_token_input = QLineEdit()
+        self.hf_token_input.setPlaceholderText("Hugging Face token（說話者分離需要）")
+        self.hf_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.hf_token_input.setText(os.environ.get('HF_TOKEN', ''))
+        token_layout.addWidget(self.hf_token_input)
+        self.toggle_token_btn = QPushButton("顯示")
+        self.toggle_token_btn.setFixedWidth(50)
+        self.toggle_token_btn.clicked.connect(self._toggle_token_visibility)
+        token_layout.addWidget(self.toggle_token_btn)
+        self.save_token_btn = QPushButton("儲存")
+        self.save_token_btn.setFixedWidth(50)
+        self.save_token_btn.clicked.connect(self._save_hf_token)
+        token_layout.addWidget(self.save_token_btn)
+        settings_layout.addLayout(token_layout)
+        
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
         
@@ -246,6 +266,46 @@ class MainWindow(QMainWindow):
         bottom_layout.addStretch()
         layout.addLayout(bottom_layout)
     
+    def _toggle_token_visibility(self):
+        """切換 token 顯示/隱藏"""
+        if self.hf_token_input.echoMode() == QLineEdit.EchoMode.Password:
+            self.hf_token_input.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_token_btn.setText("隱藏")
+        else:
+            self.hf_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_token_btn.setText("顯示")
+    
+    def _save_hf_token(self):
+        """將 HF Token 儲存到 .env 檔案"""
+        token = self.hf_token_input.text().strip()
+        if not token:
+            QMessageBox.warning(self, "警告", "請輸入 HF Token")
+            return
+        
+        # 更新環境變數
+        os.environ['HF_TOKEN'] = token
+        
+        # 寫入 .env 檔案
+        env_path = Path(__file__).parent.parent.parent / '.env'
+        
+        if env_path.exists():
+            content = env_path.read_text(encoding='utf-8')
+            # 替換現有的 HF_TOKEN 行
+            if re.search(r'^HF_TOKEN=', content, re.MULTILINE):
+                content = re.sub(r'^HF_TOKEN=.*$', f'HF_TOKEN={token}', content, flags=re.MULTILINE)
+            else:
+                content = content.rstrip('\n') + f'\nHF_TOKEN={token}\n'
+        else:
+            content = (
+                "# Hugging Face Token\n"
+                "# 取得方式：https://huggingface.co/settings/tokens\n"
+                "# 需要接受 pyannote/speaker-diarization-3.1 模型的使用條款\n"
+                f"HF_TOKEN={token}\n"
+            )
+        
+        env_path.write_text(content, encoding='utf-8')
+        QMessageBox.information(self, "已儲存", "HF Token 已儲存至 .env 檔案")
+    
     def select_file(self):
         """選擇檔案"""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -304,7 +364,8 @@ class MainWindow(QMainWindow):
             model_size=model,
             output_format=output_format,
             skip_diarization=skip_diarization,
-            use_gpu=use_gpu
+            use_gpu=use_gpu,
+            hf_token=self.hf_token_input.text().strip()
         )
         
         self.worker.progress.connect(self.on_progress)

@@ -21,7 +21,7 @@ class ASRWorker(QThread):
     
     def __init__(self, video_file, output_file, language="zh", 
                  model_size="medium", output_format="srt",
-                 skip_diarization=False, use_gpu=True):
+                 skip_diarization=False, use_gpu=True, hf_token=""):
         super().__init__()
         self.video_file = video_file
         self.output_file = output_file
@@ -30,9 +30,7 @@ class ASRWorker(QThread):
         self.output_format = output_format
         self.skip_diarization = skip_diarization
         self.use_gpu = use_gpu
-        
-        # 取得 HF_TOKEN
-        self.hf_token = os.environ.get('HF_TOKEN', '')
+        self.hf_token = hf_token or os.environ.get('HF_TOKEN', '')
     
     def run(self):
         """執行 ASR 處理（透過 subprocess）"""
