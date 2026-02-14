@@ -4,7 +4,8 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QComboBox, QCheckBox, QListWidget,
-    QProgressBar, QFileDialog, QGroupBox, QMessageBox
+    QProgressBar, QFileDialog, QGroupBox, QMessageBox,
+    QScrollArea
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont
@@ -89,12 +90,17 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ASR Multi-Speaker Transcription")
         self.setMinimumSize(800, 700)
         
-        # 主要 widget
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        # 主要 widget — 用 QScrollArea 包裝，視窗縮小時可捲動
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.setCentralWidget(scroll_area)
+        
+        content_widget = QWidget()
+        scroll_area.setWidget(content_widget)
         
         # 主要佈局
-        layout = QVBoxLayout(central_widget)
+        layout = QVBoxLayout(content_widget)
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
