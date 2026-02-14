@@ -64,8 +64,8 @@ brew install uv
 git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
 cd MultiSpeakerASRwithAppleSilicon
 
-# 使用 uv 建立虛擬環境（使用 ARM64 原生 Python）
-uv venv --python /opt/homebrew/bin/python3
+# 使用 uv 建立虛擬環境（自動下載 Python 3.10）
+uv venv --python 3.10
 
 # 啟動環境
 source .venv/bin/activate
@@ -74,7 +74,7 @@ source .venv/bin/activate
 uv pip install mlx-whisper pyannote-audio
 
 # （可選）安裝 GUI 版本所需套件
-pip install PyQt6
+uv pip install PyQt6
 ```
 
 #### 3. 設定 Hugging Face Token
@@ -115,7 +115,7 @@ export HF_TOKEN=your_huggingface_token_here
 ```bash
 git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
 cd MultiSpeakerASRwithAppleSilicon
-uv venv --python /opt/homebrew/bin/python3
+uv venv --python 3.10
 source .venv/bin/activate
 uv pip install mlx-whisper pyannote-audio
 export HF_TOKEN=your_huggingface_token_here
@@ -368,7 +368,7 @@ file $(which python)
 如果是 x86_64，請重新建立環境：
 
 ```bash
-uv venv --python /opt/homebrew/bin/python3
+uv venv --python 3.10
 ```
 
 ### 問題：說話者分離失敗
