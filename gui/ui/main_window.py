@@ -190,16 +190,18 @@ class MainWindow(QMainWindow):
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
         
-        # 開始按鈕
+        # 開始按鈕 + 進度條（同一行）
+        action_layout = QHBoxLayout()
         self.start_btn = QPushButton("開始轉錄")
         self.start_btn.clicked.connect(self.start_transcription)
-        self.start_btn.setMinimumHeight(50)
+        self.start_btn.setMinimumHeight(40)
+        self.start_btn.setFixedWidth(120)
         self.start_btn.setEnabled(False)
         self.start_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4a90e2;
                 color: white;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: bold;
                 border-radius: 5px;
             }
@@ -210,18 +212,19 @@ class MainWindow(QMainWindow):
                 background-color: #ccc;
             }
         """)
-        layout.addWidget(self.start_btn)
+        action_layout.addWidget(self.start_btn)
         
-        # 進度條
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        layout.addWidget(self.progress_bar)
-        
-        # 當前階段標籤
         self.stage_label = QLabel("")
         self.stage_label.setStyleSheet("color: #4a90e2; font-weight: bold;")
         self.stage_label.setVisible(False)
-        layout.addWidget(self.stage_label)
+        action_layout.addWidget(self.stage_label)
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setMinimumWidth(200)
+        action_layout.addWidget(self.progress_bar)
+        
+        layout.addLayout(action_layout)
         
         # 日誌區域
         log_group = QGroupBox("處理日誌")
