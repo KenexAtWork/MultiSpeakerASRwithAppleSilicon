@@ -647,6 +647,9 @@ class MainWindow(QMainWindow):
             self.save_srt_btn.setEnabled(True)
             self.edit_hint_label.setText("有未儲存的修改")
             self.edit_hint_label.setStyleSheet("color: #e67e22; font-size: 11px; font-weight: bold;")
+            # 高亮已修改的行
+            item.setBackground(QColor("#3d3522"))
+            item.setForeground(QColor("#f0c040"))
     
     def _save_srt(self):
         """將修改後的字幕存回 SRT 檔案"""
@@ -663,6 +666,11 @@ class MainWindow(QMainWindow):
             self.save_srt_btn.setEnabled(False)
             self.edit_hint_label.setText("✓ 已儲存")
             self.edit_hint_label.setStyleSheet("color: #27ae60; font-size: 11px; font-weight: bold;")
+            # 清除所有行的修改高亮
+            for i in range(self.subtitle_list.count()):
+                it = self.subtitle_list.item(i)
+                it.setBackground(QColor("transparent"))
+                it.setForeground(QColor("#d4d4d4"))
             self.log_list.addItem(f"✓ 字幕已儲存至 {self.output_file}")
             self.log_list.scrollToBottom()
         except Exception as e:
