@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(bottom_layout)
         
         # === 轉錄結果 + 播放區域（轉錄完成後顯示）===
-        self.result_group = QGroupBox("轉錄結果（點擊任一句播放）")
+        self.result_group = QGroupBox("轉錄結果（雙擊編輯，選取後按播放試聽）")
         self.result_group.setVisible(False)
         result_layout = QVBoxLayout()
         
@@ -573,19 +573,18 @@ class MainWindow(QMainWindow):
         return f"{m:02d}:{s:02d}"
     
     def _on_subtitle_clicked(self, item):
-        """點擊字幕行 → 跳到該時間點播放"""
-        row = self.subtitle_list.row(item)
-        if row < len(self.srt_segments):
-            start_ms = self.srt_segments[row]['start_ms']
-            self.player.setPosition(start_ms)
-            self.player.play()
-            self.play_btn.setText("⏸ 暫停")
+        """單擊字幕行 → 只選取，不播放"""
+        pass
     
     def _toggle_play(self):
-        """播放/暫停切換"""
+        """播放/暫停切換。如果有選取字幕行，從該行時間點開始播放"""
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self.player.pause()
         else:
+            # 如果有選取字幕行且目前是停止狀態，從該行開始播放
+            row = self.subtitle_list.currentRow()
+            if row >= 0 and row < len(self.srt_segments) and self.player.playbackState() == QMediaPlayer.PlaybackState.StoppedState:
+                self.player.setPosition(self.srt_segments[row]['start_ms'])
             self.player.play()
     
     def _stop_play(self):
