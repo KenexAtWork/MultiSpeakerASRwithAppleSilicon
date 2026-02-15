@@ -5,10 +5,11 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QComboBox, QCheckBox, QListWidget,
     QProgressBar, QFileDialog, QGroupBox, QMessageBox,
-    QScrollArea, QLineEdit
+    QScrollArea, QLineEdit, QListWidgetItem, QSlider
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QUrl
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QColor
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from pathlib import Path
 import os
 import re
@@ -85,7 +86,19 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.current_file = None
         self.worker = None
+        self.output_file = None
+        self.srt_segments = []  # 解析後的 SRT 段落
+        self._init_player()
         self.init_ui()
+    
+    def _init_player(self):
+        """初始化音訊播放器"""
+        self.player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.player.setAudioOutput(self.audio_output)
+        self.audio_output.setVolume(1.0)
+        self.player.positionChanged.connect(self._on_player_position_changed)
+        self.player.playbackStateChanged.connect(self._on_playback_state_changed)
     
     def init_ui(self):
         """初始化 UI"""
@@ -258,6 +271,63 @@ class MainWindow(QMainWindow):
         bottom_layout.addWidget(self.open_folder_btn)
         bottom_layout.addStretch()
         layout.addLayout(bottom_layout)
+        
+        # === 轉錄結果 + 播放區域（轉錄完成後顯示）===
+        self.result_group = QGroupBox("轉錄結果（點擊任一句播放）")
+        self.result_group.setVisible(False)
+        result_layout = QVBoxLayout()
+        
+        # 播放控制列
+        player_layout = QHBoxLayout()
+        self.play_btn = QPushButton("▶ 播放")
+        self.play_btn.setFixedWidth(80)
+        self.play_btn.clicked.connect(self._toggle_play)
+        player_layout.addWidget(self.play_btn)
+        
+        self.stop_btn = QPushButton("⏹ 停止")
+        self.stop_btn.setFixedWidth(80)
+        self.stop_btn.clicked.connect(self._stop_play)
+        player_layout.addWidget(self.stop_btn)
+        
+        self.player_time_label = QLabel("00:00 / 00:00")
+        self.player_time_label.setStyleSheet("color: #666; font-family: 'Monaco', 'Menlo', monospace;")
+        player_layout.addWidget(self.player_time_label)
+        
+        self.player_slider = QSlider(Qt.Orientation.Horizontal)
+        self.player_slider.setRange(0, 0)
+        self.player_slider.sliderMoved.connect(self._on_slider_moved)
+        player_layout.addWidget(self.player_slider)
+        
+        result_layout.addLayout(player_layout)
+        
+        # 字幕列表
+        self.subtitle_list = QListWidget()
+        self.subtitle_list.setMinimumHeight(250)
+        self.subtitle_list.setStyleSheet("""
+            QListWidget {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                font-family: 'Monaco', 'Menlo', 'Courier New';
+                font-size: 12px;
+                border: none;
+            }
+            QListWidget::item {
+                padding: 4px 8px;
+                border-bottom: 1px solid #333;
+            }
+            QListWidget::item:selected {
+                background-color: #264f78;
+                color: #ffffff;
+            }
+            QListWidget::item:hover {
+                background-color: #2a2d2e;
+            }
+        """)
+        self.subtitle_list.itemClicked.connect(self._on_subtitle_clicked)
+        result_layout.addWidget(self.subtitle_list)
+        
+        self.result_group.setLayout(result_layout)
+        layout.addWidget(self.result_group)
     
     def _toggle_token_visibility(self):
         """切換 token 顯示/隱藏"""
@@ -384,6 +454,7 @@ class MainWindow(QMainWindow):
     
     def on_finished(self, output_file):
         """處理完成"""
+        self.output_file = output_file
         self.progress_bar.setValue(100)
         self.stage_label.setText("✓ 處理完成！")
         
@@ -391,6 +462,10 @@ class MainWindow(QMainWindow):
         self.start_btn.setEnabled(True)
         self.select_btn.setEnabled(True)
         self.open_folder_btn.setEnabled(True)
+        
+        # 載入字幕結果
+        if output_file.endswith('.srt'):
+            self._load_subtitles(output_file)
         
         # 顯示完成訊息
         QMessageBox.information(
@@ -421,3 +496,111 @@ class MainWindow(QMainWindow):
             import subprocess
             folder = str(Path(self.current_file).parent)
             subprocess.run(["open", folder])
+    
+    # === SRT 解析 + 播放功能 ===
+    
+    def _parse_srt(self, srt_path):
+        """解析 SRT 檔案，回傳段落列表"""
+        segments = []
+        try:
+            content = Path(srt_path).read_text(encoding='utf-8')
+            blocks = content.strip().split('\n\n')
+            for block in blocks:
+                lines = block.strip().split('\n')
+                if len(lines) >= 3:
+                    # 解析時間戳: 00:00:00,000 --> 00:00:02,500
+                    time_match = re.match(
+                        r'(\d{2}):(\d{2}):(\d{2}),(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2}),(\d{3})',
+                        lines[1]
+                    )
+                    if time_match:
+                        g = time_match.groups()
+                        start_ms = (int(g[0])*3600 + int(g[1])*60 + int(g[2])) * 1000 + int(g[3])
+                        end_ms = (int(g[4])*3600 + int(g[5])*60 + int(g[6])) * 1000 + int(g[7])
+                        text = '\n'.join(lines[2:])
+                        segments.append({
+                            'start_ms': start_ms,
+                            'end_ms': end_ms,
+                            'text': text,
+                            'time_str': lines[1],
+                        })
+        except Exception as e:
+            self.log_list.addItem(f"⚠ SRT 解析失敗: {e}")
+        return segments
+    
+    def _load_subtitles(self, srt_path):
+        """載入 SRT 並顯示在字幕列表"""
+        self.srt_segments = self._parse_srt(srt_path)
+        self.subtitle_list.clear()
+        
+        for seg in self.srt_segments:
+            # 格式: [00:00:00] [SPEAKER_00] 文字內容
+            start_str = self._ms_to_time_str(seg['start_ms'])
+            item = QListWidgetItem(f"[{start_str}] {seg['text']}")
+            self.subtitle_list.addItem(item)
+        
+        if self.srt_segments:
+            self.result_group.setVisible(True)
+            # 載入媒體檔案到播放器
+            self.player.setSource(QUrl.fromLocalFile(self.current_file))
+            self.player.durationChanged.connect(self._on_duration_changed)
+    
+    def _ms_to_time_str(self, ms):
+        """毫秒轉 MM:SS"""
+        total_sec = ms // 1000
+        m = total_sec // 60
+        s = total_sec % 60
+        return f"{m:02d}:{s:02d}"
+    
+    def _on_subtitle_clicked(self, item):
+        """點擊字幕行 → 跳到該時間點播放"""
+        row = self.subtitle_list.row(item)
+        if row < len(self.srt_segments):
+            start_ms = self.srt_segments[row]['start_ms']
+            self.player.setPosition(start_ms)
+            self.player.play()
+            self.play_btn.setText("⏸ 暫停")
+    
+    def _toggle_play(self):
+        """播放/暫停切換"""
+        if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self.player.pause()
+        else:
+            self.player.play()
+    
+    def _stop_play(self):
+        """停止播放"""
+        self.player.stop()
+    
+    def _on_slider_moved(self, position):
+        """拖動進度條"""
+        self.player.setPosition(position)
+    
+    def _on_duration_changed(self, duration):
+        """媒體總時長更新"""
+        self.player_slider.setRange(0, duration)
+    
+    def _on_player_position_changed(self, position):
+        """播放位置更新 → 更新進度條和時間標籤，高亮當前字幕"""
+        self.player_slider.setValue(position)
+        
+        # 更新時間標籤
+        duration = self.player.duration()
+        self.player_time_label.setText(
+            f"{self._ms_to_time_str(position)} / {self._ms_to_time_str(duration)}"
+        )
+        
+        # 高亮當前播放的字幕行
+        for i, seg in enumerate(self.srt_segments):
+            if seg['start_ms'] <= position < seg['end_ms']:
+                if self.subtitle_list.currentRow() != i:
+                    self.subtitle_list.setCurrentRow(i)
+                    self.subtitle_list.scrollToItem(self.subtitle_list.item(i))
+                break
+    
+    def _on_playback_state_changed(self, state):
+        """播放狀態變更 → 更新按鈕文字"""
+        if state == QMediaPlayer.PlaybackState.PlayingState:
+            self.play_btn.setText("⏸ 暫停")
+        else:
+            self.play_btn.setText("▶ 播放")
