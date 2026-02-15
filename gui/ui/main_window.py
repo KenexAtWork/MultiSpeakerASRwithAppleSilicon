@@ -324,7 +324,27 @@ class MainWindow(QMainWindow):
             }
         """)
         self.subtitle_list.itemClicked.connect(self._on_subtitle_clicked)
+        self.subtitle_list.itemDoubleClicked.connect(self._on_subtitle_double_clicked)
+        self.subtitle_list.itemChanged.connect(self._on_subtitle_edited)
+        self._editing_subtitle = False  # 防止 itemChanged 迴圈
         result_layout.addWidget(self.subtitle_list)
+        
+        # 儲存按鈕列
+        save_layout = QHBoxLayout()
+        self.save_srt_btn = QPushButton("💾 儲存修改")
+        self.save_srt_btn.clicked.connect(self._save_srt)
+        self.save_srt_btn.setEnabled(False)
+        self.save_srt_btn.setStyleSheet("""
+            QPushButton { background-color: #27ae60; color: white; font-weight: bold; border-radius: 4px; padding: 6px 16px; }
+            QPushButton:hover { background-color: #219a52; }
+            QPushButton:disabled { background-color: #ccc; }
+        """)
+        save_layout.addWidget(self.save_srt_btn)
+        self.edit_hint_label = QLabel("雙擊字幕可編輯，修改後點擊儲存")
+        self.edit_hint_label.setStyleSheet("color: #888; font-size: 11px;")
+        save_layout.addWidget(self.edit_hint_label)
+        save_layout.addStretch()
+        result_layout.addLayout(save_layout)
         
         self.result_group.setLayout(result_layout)
         layout.addWidget(self.result_group)
@@ -604,3 +624,52 @@ class MainWindow(QMainWindow):
             self.play_btn.setText("⏸ 暫停")
         else:
             self.play_btn.setText("▶ 播放")
+    
+    # === 字幕編輯功能 ===
+    
+    def _on_subtitle_double_clicked(self, item):
+        """雙擊字幕行 → 進入編輯模式"""
+        self._editing_subtitle = True
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        self.subtitle_list.editItem(item)
+    
+    def _on_subtitle_edited(self, item):
+        """字幕編輯完成 → 更新 srt_segments 資料"""
+        if not self._editing_subtitle:
+            return
+        self._editing_subtitle = False
+        
+        row = self.subtitle_list.row(item)
+        if row < len(self.srt_segments):
+            new_text = item.text()
+            # 從顯示文字中提取實際字幕（去掉時間戳前綴 [MM:SS] ）
+            match = re.match(r'^\[\d{2}:\d{2}\]\s*', new_text)
+            if match:
+                new_text = new_text[match.end():]
+            self.srt_segments[row]['text'] = new_text
+            self.save_srt_btn.setEnabled(True)
+            self.edit_hint_label.setText("有未儲存的修改")
+            self.edit_hint_label.setStyleSheet("color: #e67e22; font-size: 11px; font-weight: bold;")
+        
+        # 移除編輯旗標
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+    
+    def _save_srt(self):
+        """將修改後的字幕存回 SRT 檔案"""
+        if not self.output_file or not self.srt_segments:
+            return
+        
+        try:
+            with open(self.output_file, 'w', encoding='utf-8') as f:
+                for i, seg in enumerate(self.srt_segments, 1):
+                    f.write(f"{i}\n")
+                    f.write(f"{seg['time_str']}\n")
+                    f.write(f"{seg['text']}\n\n")
+            
+            self.save_srt_btn.setEnabled(False)
+            self.edit_hint_label.setText("✓ 已儲存")
+            self.edit_hint_label.setStyleSheet("color: #27ae60; font-size: 11px; font-weight: bold;")
+            self.log_list.addItem(f"✓ 字幕已儲存至 {self.output_file}")
+            self.log_list.scrollToBottom()
+        except Exception as e:
+            QMessageBox.critical(self, "儲存失敗", f"無法儲存字幕:\n{e}")
