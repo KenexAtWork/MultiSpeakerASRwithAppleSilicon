@@ -303,6 +303,7 @@ class MainWindow(QMainWindow):
         # 字幕列表
         self.subtitle_list = QListWidget()
         self.subtitle_list.setMinimumHeight(250)
+        self.subtitle_list.setEditTriggers(QListWidget.EditTrigger.DoubleClicked)
         self.subtitle_list.setStyleSheet("""
             QListWidget {
                 background-color: #1e1e1e;
@@ -554,14 +555,13 @@ class MainWindow(QMainWindow):
         self.subtitle_list.clear()
         
         for seg in self.srt_segments:
-            # 格式: [00:00:00] [SPEAKER_00] 文字內容
             start_str = self._ms_to_time_str(seg['start_ms'])
             item = QListWidgetItem(f"[{start_str}] {seg['text']}")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
             self.subtitle_list.addItem(item)
         
         if self.srt_segments:
             self.result_group.setVisible(True)
-            # 載入媒體檔案到播放器
             self.player.setSource(QUrl.fromLocalFile(self.current_file))
             self.player.durationChanged.connect(self._on_duration_changed)
     
@@ -627,10 +627,8 @@ class MainWindow(QMainWindow):
     # === 字幕編輯功能 ===
     
     def _on_subtitle_double_clicked(self, item):
-        """雙擊字幕行 → 進入編輯模式"""
+        """雙擊字幕行 → editTriggers 已處理編輯，這裡標記狀態"""
         self._editing_subtitle = True
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
-        self.subtitle_list.editItem(item)
     
     def _on_subtitle_edited(self, item):
         """字幕編輯完成 → 更新 srt_segments 資料"""
@@ -649,9 +647,6 @@ class MainWindow(QMainWindow):
             self.save_srt_btn.setEnabled(True)
             self.edit_hint_label.setText("有未儲存的修改")
             self.edit_hint_label.setStyleSheet("color: #e67e22; font-size: 11px; font-weight: bold;")
-        
-        # 移除編輯旗標
-        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     
     def _save_srt(self):
         """將修改後的字幕存回 SRT 檔案"""
