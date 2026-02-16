@@ -383,9 +383,10 @@ class MainWindow(QMainWindow):
         summary_action_layout.addWidget(QLabel("模型:"))
         self.bedrock_model_combo = QComboBox()
         self.bedrock_model_combo.addItems([
-            "anthropic.claude-3-5-sonnet-20241022-v2:0",
-            "anthropic.claude-3-5-haiku-20241022-v1:0",
-            "anthropic.claude-3-haiku-20240307-v1:0",
+            "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "apac.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            "apac.anthropic.claude-sonnet-4-20250514-v1:0",
+            "apac.anthropic.claude-3-haiku-20240307-v1:0",
         ])
         summary_action_layout.addWidget(self.bedrock_model_combo)
         
