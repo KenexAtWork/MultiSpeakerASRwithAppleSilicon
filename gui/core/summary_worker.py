@@ -1,7 +1,8 @@
 """
-Summary Worker - 透過 AWS Bedrock (Claude) 產生會議摘要
+Summary Worker - 透過 AWS Bedrock 產生會議摘要
+支援 Claude (Anthropic) 和 Amazon Nova 模型
+使用 Bedrock Converse API 統一呼叫格式
 """
-import json
 import boto3
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -29,11 +30,11 @@ DEFAULT_PROMPT = """你是一位專業的會議記錄整理助手。請根據以
 
 
 class SummaryWorker(QThread):
-    """Bedrock Claude 摘要 Worker"""
+    """Bedrock 摘要 Worker（Converse API，支援 Claude + Nova）"""
 
-    progress = pyqtSignal(str)   # 進度訊息
-    finished = pyqtSignal(str)   # 完成（摘要內容）
-    error = pyqtSignal(str)      # 錯誤
+    progress = pyqtSignal(str)
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
 
     def __init__(self, transcript, prompt_template=None,
                  model_id="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
@@ -56,25 +57,20 @@ class SummaryWorker(QThread):
 
             prompt = self.prompt_template.replace("{transcript}", self.transcript)
 
-            body = json.dumps({
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 4096,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ]
-            })
-
             self.progress.emit("⏳ 等待 LLM 回應...")
 
-            response = client.invoke_model(
+            # 使用 Converse API — 統一支援 Claude / Nova / 其他模型
+            response = client.converse(
                 modelId=self.model_id,
-                contentType="application/json",
-                accept="application/json",
-                body=body
+                messages=[
+                    {"role": "user", "content": [{"text": prompt}]}
+                ],
+                inferenceConfig={"maxTokens": 4096}
             )
 
-            result = json.loads(response["body"].read())
-            summary = result["content"][0]["text"]
+            # Converse API 統一回傳格式
+            output = response["output"]["message"]["content"]
+            summary = "".join(block["text"] for block in output if "text" in block)
 
             self.progress.emit("✓ 摘要產生完成")
             self.finished.emit(summary)

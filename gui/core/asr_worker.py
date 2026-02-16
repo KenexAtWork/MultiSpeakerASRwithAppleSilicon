@@ -13,11 +13,12 @@ class ASRWorker(QThread):
     """ASR 處理 Worker"""
     
     # 信號
-    progress = pyqtSignal(int)  # 進度 (0-100)
+    progress = pyqtSignal(int)       # 進度 (0-100)
     stage_changed = pyqtSignal(str)  # 階段變更
-    log_message = pyqtSignal(str)  # 日誌訊息
-    finished = pyqtSignal(str)  # 完成 (輸出檔案路徑)
-    error = pyqtSignal(str)  # 錯誤訊息
+    log_message = pyqtSignal(str)    # 日誌訊息（新增一行）
+    log_replace = pyqtSignal(str)    # 日誌訊息（覆蓋最後一行，用於 tqdm 進度）
+    finished = pyqtSignal(str)       # 完成 (輸出檔案路徑)
+    error = pyqtSignal(str)          # 錯誤訊息
     
     def __init__(self, video_file, output_file, language="zh", 
                  model_size="medium", output_format="srt",
@@ -74,27 +75,53 @@ class ASRWorker(QThread):
             env = os.environ.copy()
             if self.hf_token:
                 env['HF_TOKEN'] = self.hf_token
-            # 強制 Python 不緩衝輸出
             env['PYTHONUNBUFFERED'] = '1'
             
-            # 使用 subprocess 執行，逐行讀取輸出
+            # 使用 subprocess 執行
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
                 env=env,
                 cwd=asr_dir,
             )
             
-            # 即時讀取輸出
-            for line in process.stdout:
-                line = line.rstrip('\n')
-                if line:
-                    self.log_message.emit(line)
-                    # 根據輸出內容更新進度
-                    self._update_progress(line)
+            # 用 TextIOWrapper 正確處理 UTF-8 多字節，newline='' 保留 \r
+            import io
+            stdout = io.TextIOWrapper(process.stdout, encoding='utf-8', errors='replace', newline='')
+            
+            buf = ""
+            in_cr_mode = False
+            while True:
+                ch = stdout.read(1)
+                if not ch:
+                    break
+                if ch == '\n':
+                    line = buf.strip()
+                    if line:
+                        if in_cr_mode:
+                            self.log_replace.emit(line)
+                        else:
+                            self.log_message.emit(line)
+                        self._update_progress(line)
+                    buf = ""
+                    in_cr_mode = False
+                elif ch == '\r':
+                    line = buf.strip()
+                    if line:
+                        if in_cr_mode:
+                            self.log_replace.emit(line)
+                        else:
+                            self.log_message.emit(line)
+                            in_cr_mode = True
+                        self._update_progress(line)
+                    buf = ""
+                else:
+                    buf += ch
+            
+            if buf.strip():
+                self.log_message.emit(buf.strip())
+                self._update_progress(buf.strip())
             
             process.wait()
             

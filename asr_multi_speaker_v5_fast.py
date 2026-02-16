@@ -214,10 +214,35 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 tprint("⏳ 執行說話者分離（這可能需要 1-2 分鐘）...")
                 tprint("提示：使用 GPU 可加速 2-3 倍")
                 
-                # 使用 hook 顯示進度
-                from pyannote.audio.pipelines.utils.hook import ProgressHook
-                with ProgressHook() as hook:
+                # 自訂進度回報（取代 tqdm ProgressHook，確保 pipe 環境即時輸出）
+                class StdoutProgressHook:
+                    def __init__(self):
+                        self._current_step = None
+                        self._last_pct = -1
+                    def __enter__(self):
+                        return self
+                    def __exit__(self, *args):
+                        pass
+                    def __call__(self, step_name, step_artifact, file=None, total=None, completed=None):
+                        if step_name != self._current_step:
+                            if self._current_step is not None:
+                                print(flush=True)  # 換行結束上一步
+                            self._current_step = step_name
+                            self._last_pct = -1
+                        if total is not None and completed is not None:
+                            pct = int(completed / total * 100) if total > 0 else 0
+                            # 每 5% 更新一次，避免頻繁 I/O 拖慢速度
+                            if pct >= self._last_pct + 5 or completed == total:
+                                self._last_pct = pct
+                                bar_len = 30
+                                filled = int(bar_len * completed / total) if total > 0 else 0
+                                bar = '█' * filled + '─' * (bar_len - filled)
+                                print(f"\r{step_name} {bar} {pct:3d}%", end='', flush=True)
+                        return step_artifact
+
+                with StdoutProgressHook() as hook:
                     diarization_result = pipeline(temp_wav_path, hook=hook)
+                print(flush=True)  # 最後換行
                 
                 # 提取說話者資訊
                 if hasattr(diarization_result, 'speaker_diarization'):

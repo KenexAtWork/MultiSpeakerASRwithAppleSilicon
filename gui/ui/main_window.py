@@ -8,12 +8,13 @@ from PyQt6.QtWidgets import (
     QScrollArea, QLineEdit, QListWidgetItem, QSlider,
     QTextEdit, QSplitter
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QUrl
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QColor
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from pathlib import Path
 import os
 import re
+import boto3
 
 from core.asr_worker import ASRWorker
 from core.summary_worker import SummaryWorker, DEFAULT_PROMPT
@@ -382,19 +383,48 @@ class MainWindow(QMainWindow):
         summary_action_layout = QHBoxLayout()
         summary_action_layout.addWidget(QLabel("模型:"))
         self.bedrock_model_combo = QComboBox()
-        self.bedrock_model_combo.addItems([
-            "apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
-            "apac.anthropic.claude-3-7-sonnet-20250219-v1:0",
-            "apac.anthropic.claude-sonnet-4-20250514-v1:0",
-            "apac.anthropic.claude-3-haiku-20240307-v1:0",
-        ])
+        self.bedrock_model_combo.setMinimumWidth(300)
+        self.bedrock_model_combo.setEditable(True)  # 允許手動輸入 profile ID
         summary_action_layout.addWidget(self.bedrock_model_combo)
         
+        self.refresh_models_btn = QPushButton("🔄")
+        self.refresh_models_btn.setFixedWidth(32)
+        self.refresh_models_btn.setToolTip("重新載入可用模型")
+        self.refresh_models_btn.clicked.connect(self._load_bedrock_models)
+        summary_action_layout.addWidget(self.refresh_models_btn)
+        
         summary_action_layout.addWidget(QLabel("Region:"))
-        self.bedrock_region_input = QLineEdit()
-        self.bedrock_region_input.setPlaceholderText("預設使用 AWS CLI 設定")
-        self.bedrock_region_input.setFixedWidth(150)
-        summary_action_layout.addWidget(self.bedrock_region_input)
+        self.bedrock_region_combo = QComboBox()
+        self.bedrock_region_combo.setFixedWidth(170)
+        # Bedrock Claude 常用 regions
+        self._bedrock_regions = [
+            ("ap-northeast-1 (東京)", "ap-northeast-1"),
+            ("us-east-1 (維吉尼亞)", "us-east-1"),
+            ("us-west-2 (奧勒岡)", "us-west-2"),
+            ("eu-west-1 (愛爾蘭)", "eu-west-1"),
+            ("eu-central-1 (法蘭克福)", "eu-central-1"),
+            ("ap-southeast-1 (新加坡)", "ap-southeast-1"),
+            ("ap-southeast-2 (雪梨)", "ap-southeast-2"),
+            ("ap-northeast-2 (首爾)", "ap-northeast-2"),
+        ]
+        for label, rid in self._bedrock_regions:
+            self.bedrock_region_combo.addItem(label, rid)
+        # 預設選 .env 儲存的 region，fallback 到 us-east-1
+        saved_region, saved_model = self._load_bedrock_settings()
+        target_region = saved_region or "us-east-1"
+        for i, (_, rid) in enumerate(self._bedrock_regions):
+            if rid == target_region:
+                self.bedrock_region_combo.setCurrentIndex(i)
+                break
+        self._saved_bedrock_model = saved_model or "amazon.nova-2-lite-v1:0"
+        self.bedrock_region_combo.currentIndexChanged.connect(self._on_region_changed)
+        summary_action_layout.addWidget(self.bedrock_region_combo)
+        
+        self.refresh_models_btn = QPushButton("🔄")
+        self.refresh_models_btn.setFixedWidth(32)
+        self.refresh_models_btn.setToolTip("重新載入可用模型")
+        self.refresh_models_btn.clicked.connect(self._load_bedrock_models)
+        summary_action_layout.addWidget(self.refresh_models_btn)
         
         self.generate_summary_btn = QPushButton("🤖 產生摘要")
         self.generate_summary_btn.clicked.connect(self._generate_summary)
@@ -439,6 +469,9 @@ class MainWindow(QMainWindow):
         
         self.summary_group.setLayout(summary_layout)
         layout.addWidget(self.summary_group)
+        
+        # 載入上次的 ASR 設定
+        self._load_asr_settings()
     
     def _toggle_token_visibility(self):
         """切換 token 顯示/隱藏"""
@@ -480,6 +513,86 @@ class MainWindow(QMainWindow):
         env_path.write_text(content, encoding='utf-8')
         QMessageBox.information(self, "已儲存", "HF Token 已儲存至 .env 檔案")
     
+    def _get_env_path(self):
+        """取得 .env 檔案路徑"""
+        return Path(__file__).parent.parent.parent / '.env'
+    
+    def _load_bedrock_settings(self):
+        """從 .env 讀取上次使用的 Bedrock region 和 model"""
+        region = self._read_env('BEDROCK_REGION')
+        model = self._read_env('BEDROCK_MODEL')
+        return region, model
+    
+    def _save_bedrock_settings(self, region, model_id):
+        """將 Bedrock region 和 model 儲存到 .env"""
+        self._write_env('BEDROCK_REGION', region)
+        self._write_env('BEDROCK_MODEL', model_id)
+    
+    def _read_env(self, key):
+        """從 .env 讀取指定 key 的值"""
+        env_path = self._get_env_path()
+        if env_path.exists():
+            for line in env_path.read_text(encoding='utf-8').splitlines():
+                line = line.strip()
+                if line.startswith(f'{key}='):
+                    return line.split('=', 1)[1].strip()
+        return None
+    
+    def _write_env(self, key, value):
+        """將指定 key=value 寫入 .env（更新或新增）"""
+        env_path = self._get_env_path()
+        if env_path.exists():
+            content = env_path.read_text(encoding='utf-8')
+        else:
+            content = ""
+        if re.search(rf'^{key}=', content, re.MULTILINE):
+            content = re.sub(rf'^{key}=.*', f'{key}={value}', content, flags=re.MULTILINE)
+        else:
+            content = content.rstrip('\n') + f'\n{key}={value}\n'
+        env_path.write_text(content, encoding='utf-8')
+    
+    def _load_asr_settings(self):
+        """從 .env 載入 ASR 設定並套用到 UI"""
+        # Whisper 模型
+        saved_model = self._read_env('ASR_MODEL')
+        if saved_model:
+            for i in range(self.model_combo.count()):
+                if self.model_combo.itemText(i).startswith(saved_model):
+                    self.model_combo.setCurrentIndex(i)
+                    break
+        # 語言
+        saved_lang = self._read_env('ASR_LANGUAGE')
+        if saved_lang:
+            for i in range(self.language_combo.count()):
+                if self.language_combo.itemText(i).startswith(saved_lang):
+                    self.language_combo.setCurrentIndex(i)
+                    break
+        # 輸出格式
+        saved_fmt = self._read_env('ASR_FORMAT')
+        if saved_fmt:
+            idx = self.format_combo.findText(saved_fmt, Qt.MatchFlag.MatchExactly)
+            if idx >= 0:
+                self.format_combo.setCurrentIndex(idx)
+        # GPU
+        saved_gpu = self._read_env('ASR_USE_GPU')
+        if saved_gpu is not None:
+            self.use_gpu_cb.setChecked(saved_gpu.lower() == 'true')
+        # 跳過說話者分離
+        saved_skip = self._read_env('ASR_SKIP_DIARIZATION')
+        if saved_skip is not None:
+            self.skip_diarization_cb.setChecked(saved_skip.lower() == 'true')
+    
+    def _save_asr_settings(self):
+        """將目前 ASR 設定儲存到 .env"""
+        model = self.model_combo.currentText().split()[0]
+        language = self.language_combo.currentText().split()[0]
+        fmt = self.format_combo.currentText()
+        self._write_env('ASR_MODEL', model)
+        self._write_env('ASR_LANGUAGE', language)
+        self._write_env('ASR_FORMAT', fmt)
+        self._write_env('ASR_USE_GPU', str(self.use_gpu_cb.isChecked()))
+        self._write_env('ASR_SKIP_DIARIZATION', str(self.skip_diarization_cb.isChecked()))
+    
     def select_file(self):
         """選擇檔案"""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -510,7 +623,7 @@ class MainWindow(QMainWindow):
         """開始轉錄"""
         if not self.current_file:
             return
-        
+
         # 取得設定
         language = self.language_combo.currentText().split()[0]
         model = self.model_combo.currentText().split()[0]
@@ -518,10 +631,13 @@ class MainWindow(QMainWindow):
         skip_diarization = self.skip_diarization_cb.isChecked()
         use_gpu = self.use_gpu_cb.isChecked()
         
+        # 儲存 ASR 設定
+        self._save_asr_settings()
+
         # 產生輸出檔名
         input_path = Path(self.current_file)
         output_path = input_path.parent / f"{input_path.stem}_transcription.{output_format.lower()}"
-        
+
         # 停用控制項
         self.start_btn.setEnabled(False)
         self.select_btn.setEnabled(False)
@@ -529,7 +645,20 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.stage_label.setVisible(True)
         self.log_list.clear()
-        
+
+        # 重置字幕/播放器/摘要狀態
+        self.player.stop()
+        self.srt_segments = []
+        self.subtitle_list.clear()
+        self.result_group.setVisible(False)
+        self.summary_group.setVisible(False)
+        self.summary_output.clear()
+        self.summary_status_label.setText("")
+        self.save_srt_btn.setEnabled(False)
+        self.save_summary_btn.setEnabled(False)
+        self.edit_hint_label.setText("雙擊字幕可編輯，修改後點擊儲存")
+        self.edit_hint_label.setStyleSheet("color: #888; font-size: 11px;")
+
         # 建立並啟動 worker
         self.worker = ASRWorker(
             video_file=self.current_file,
@@ -541,13 +670,14 @@ class MainWindow(QMainWindow):
             use_gpu=use_gpu,
             hf_token=self.hf_token_input.text().strip()
         )
-        
+
         self.worker.progress.connect(self.on_progress)
         self.worker.stage_changed.connect(self.on_stage_changed)
         self.worker.log_message.connect(self.on_log_message)
+        self.worker.log_replace.connect(self.on_log_replace)
         self.worker.finished.connect(self.on_finished)
         self.worker.error.connect(self.on_error)
-        
+
         self.worker.start()
     
     def on_progress(self, value):
@@ -561,6 +691,15 @@ class MainWindow(QMainWindow):
     def on_log_message(self, message):
         """添加日誌訊息"""
         self.log_list.addItem(message)
+        self.log_list.scrollToBottom()
+    
+    def on_log_replace(self, message):
+        """覆蓋最後一行日誌（用於 tqdm 進度更新）"""
+        count = self.log_list.count()
+        if count > 0:
+            self.log_list.item(count - 1).setText(message)
+        else:
+            self.log_list.addItem(message)
         self.log_list.scrollToBottom()
     
     def on_finished(self, output_file):
@@ -578,6 +717,9 @@ class MainWindow(QMainWindow):
         if output_file.endswith('.srt'):
             self._load_subtitles(output_file)
             self.summary_group.setVisible(True)
+            # 動態載入 Bedrock 模型列表（首次顯示時）
+            if self.bedrock_model_combo.count() == 0:
+                self._load_bedrock_models()
         
         # 顯示完成訊息
         QMessageBox.information(
@@ -644,15 +786,20 @@ class MainWindow(QMainWindow):
         """載入 SRT 並顯示在字幕列表"""
         self.srt_segments = self._parse_srt(srt_path)
         self.subtitle_list.clear()
-        
+
         for seg in self.srt_segments:
             start_str = self._ms_to_time_str(seg['start_ms'])
             item = QListWidgetItem(f"[{start_str}] {seg['text']}")
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
             self.subtitle_list.addItem(item)
-        
+
         if self.srt_segments:
             self.result_group.setVisible(True)
+            # 避免重複 connect
+            try:
+                self.player.durationChanged.disconnect(self._on_duration_changed)
+            except TypeError:
+                pass
             self.player.setSource(QUrl.fromLocalFile(self.current_file))
             self.player.durationChanged.connect(self._on_duration_changed)
     
@@ -784,12 +931,23 @@ class MainWindow(QMainWindow):
         
         transcript = self._get_transcript_text()
         prompt_template = self.prompt_edit.toPlainText()
-        model_id = self.bedrock_model_combo.currentText()
-        region = self.bedrock_region_input.text().strip() or None
+        # 優先從 itemData 取 inference profile ID，fallback 到顯示文字
+        idx = self.bedrock_model_combo.currentIndex()
+        model_id = None
+        if idx >= 0:
+            model_id = self.bedrock_model_combo.itemData(idx)
+        if not model_id:
+            model_id = self.bedrock_model_combo.currentText()
+        region = self.bedrock_region_combo.currentData() or "us-east-1"
+        
+        # 儲存選擇到 .env
+        self._save_bedrock_settings(region, model_id)
         
         self.generate_summary_btn.setEnabled(False)
         self.summary_status_label.setText("⏳ 產生摘要中...")
         self.summary_output.clear()
+        self.log_list.addItem(f"📤 摘要模型: {model_id}")
+        self.log_list.scrollToBottom()
         
         self.summary_worker = SummaryWorker(
             transcript=transcript,
@@ -833,3 +991,128 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "已儲存", f"摘要已儲存至:\n{summary_path}")
         except Exception as e:
             QMessageBox.critical(self, "儲存失敗", f"無法儲存摘要:\n{e}")
+
+    def _on_region_changed(self, index):
+        """Region 切換時自動重新載入模型列表"""
+        if index >= 0 and self.summary_group.isVisible():
+            self._load_bedrock_models()
+
+    def _load_bedrock_models(self):
+        """從 Bedrock API 動態載入可用的 Claude inference profiles"""
+        import threading
+
+        self.refresh_models_btn.setEnabled(False)
+        self.refresh_models_btn.setText("⏳")
+        self.bedrock_model_combo.clear()
+        self.bedrock_model_combo.addItem("載入中...")
+
+        region = self.bedrock_region_combo.currentData() or "ap-northeast-1"
+
+        def _fetch():
+            try:
+                session = boto3.Session()
+                client = session.client("bedrock", region_name=region)
+
+                profiles = []
+                paginator = client.get_paginator('list_inference_profiles')
+                for page in paginator.paginate():
+                    for p in page.get('inferenceProfileSummaries', []):
+                        pid = p.get('inferenceProfileId', '')
+                        name = p.get('inferenceProfileName', pid)
+                        # 保留 Claude / Anthropic 和 Amazon Nova 模型
+                        if 'anthropic' in pid.lower() or 'claude' in name.lower() \
+                                or 'nova' in pid.lower() or 'nova' in name.lower():
+                            profiles.append((name, pid))
+
+                # 排序：Opus > Sonnet > Haiku > Nova Pro > Nova Lite > Nova Micro
+                def _sort_key(item):
+                    n = item[0].lower()
+                    if 'opus' in n:
+                        return (0, n)
+                    elif 'sonnet' in n:
+                        return (1, n)
+                    elif 'haiku' in n:
+                        return (2, n)
+                    elif 'nova' in n and 'pro' in n:
+                        return (3, n)
+                    elif 'nova' in n and 'lite' in n:
+                        return (4, n)
+                    elif 'nova' in n:
+                        return (5, n)
+                    return (6, n)
+
+                profiles.sort(key=_sort_key)
+
+                # 回到 UI 執行緒更新 combo box
+                from PyQt6.QtCore import QMetaObject, Qt as QtNamespace, Q_ARG
+                self._bedrock_profiles = profiles
+                QMetaObject.invokeMethod(
+                    self, "_apply_bedrock_models",
+                    QtNamespace.ConnectionType.QueuedConnection
+                )
+            except Exception as e:
+                self._bedrock_load_error = str(e)
+                from PyQt6.QtCore import QMetaObject, Qt as QtNamespace
+                QMetaObject.invokeMethod(
+                    self, "_apply_bedrock_models_error",
+                    QtNamespace.ConnectionType.QueuedConnection
+                )
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    @pyqtSlot()
+    def _apply_bedrock_models(self):
+        """在 UI 執行緒中套用載入的模型列表"""
+        self.bedrock_model_combo.clear()
+        profiles = getattr(self, '_bedrock_profiles', [])
+        if profiles:
+            for name, pid in profiles:
+                self.bedrock_model_combo.addItem(f"{name}", pid)
+            # 優先選上次使用的模型
+            saved_model = getattr(self, '_saved_bedrock_model', '')
+            selected = False
+            if saved_model:
+                for i in range(self.bedrock_model_combo.count()):
+                    if self.bedrock_model_combo.itemData(i) == saved_model:
+                        self.bedrock_model_combo.setCurrentIndex(i)
+                        selected = True
+                        break
+            # fallback: 選第一個 nova-2-lite 或 sonnet
+            if not selected:
+                for i in range(self.bedrock_model_combo.count()):
+                    pid = self.bedrock_model_combo.itemData(i) or ''
+                    if 'nova-2-lite' in pid:
+                        self.bedrock_model_combo.setCurrentIndex(i)
+                        selected = True
+                        break
+            if not selected and self.bedrock_model_combo.count() > 0:
+                self.bedrock_model_combo.setCurrentIndex(0)
+        else:
+            self._add_fallback_models()
+        self.refresh_models_btn.setEnabled(True)
+        self.refresh_models_btn.setText("🔄")
+
+    @pyqtSlot()
+    def _apply_bedrock_models_error(self):
+        """載入模型失敗時使用 fallback"""
+        error = getattr(self, '_bedrock_load_error', 'Unknown error')
+        self.log_list.addItem(f"⚠ 載入 Bedrock 模型失敗: {error}，使用預設列表")
+        self.log_list.scrollToBottom()
+        self._add_fallback_models()
+        self.refresh_models_btn.setEnabled(True)
+        self.refresh_models_btn.setText("🔄")
+
+    def _add_fallback_models(self):
+        """API 失敗時的預設模型列表"""
+        fallback = [
+            ("Claude Sonnet 4 (APAC)", "apac.anthropic.claude-sonnet-4-20250514-v1:0"),
+            ("Claude Sonnet 3.5 v2 (APAC)", "apac.anthropic.claude-3-5-sonnet-20241022-v2:0"),
+            ("Claude Haiku 3 (APAC)", "apac.anthropic.claude-3-haiku-20240307-v1:0"),
+            ("Amazon Nova Pro", "amazon.nova-pro-v1:0"),
+            ("Amazon Nova Lite", "amazon.nova-lite-v1:0"),
+            ("Amazon Nova Micro", "amazon.nova-micro-v1:0"),
+        ]
+        self.bedrock_model_combo.clear()
+        for name, pid in fallback:
+            self.bedrock_model_combo.addItem(name, pid)
+
