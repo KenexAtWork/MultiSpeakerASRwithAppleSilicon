@@ -47,6 +47,10 @@ if ! echo "$PIP_LIST" | grep -q "PyQt6"; then
     MISSING_PACKAGES+=("PyQt6")
 fi
 
+if ! echo "$PIP_LIST" | grep -q "boto3"; then
+    MISSING_PACKAGES+=("boto3")
+fi
+
 if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
     echo "⏳ 安裝缺少的套件: ${MISSING_PACKAGES[*]}"
     if command -v uv &>/dev/null; then
