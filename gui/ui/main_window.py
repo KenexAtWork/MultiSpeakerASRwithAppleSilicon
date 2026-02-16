@@ -5,7 +5,8 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QComboBox, QCheckBox, QListWidget,
     QProgressBar, QFileDialog, QGroupBox, QMessageBox,
-    QScrollArea, QLineEdit, QListWidgetItem, QSlider
+    QScrollArea, QLineEdit, QListWidgetItem, QSlider,
+    QTextEdit, QSplitter
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QColor
@@ -15,6 +16,7 @@ import os
 import re
 
 from core.asr_worker import ASRWorker
+from core.summary_worker import SummaryWorker, DEFAULT_PROMPT
 
 
 class DropZone(QLabel):
@@ -88,6 +90,7 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.output_file = None
         self.srt_segments = []  # 解析後的 SRT 段落
+        self.summary_worker = None
         self._init_player()
         self.init_ui()
     
@@ -349,6 +352,92 @@ class MainWindow(QMainWindow):
         
         self.result_group.setLayout(result_layout)
         layout.addWidget(self.result_group)
+        
+        # === 會議摘要區域 ===
+        self.summary_group = QGroupBox("會議摘要（AWS Bedrock Claude）")
+        self.summary_group.setVisible(False)
+        summary_layout = QVBoxLayout()
+        
+        # Prompt 編輯區
+        prompt_label = QLabel("Prompt（可自訂）:")
+        prompt_label.setStyleSheet("font-weight: bold;")
+        summary_layout.addWidget(prompt_label)
+        
+        self.prompt_edit = QTextEdit()
+        self.prompt_edit.setPlainText(DEFAULT_PROMPT)
+        self.prompt_edit.setMaximumHeight(120)
+        self.prompt_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #f8f8f8;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-family: 'Monaco', 'Menlo', 'Courier New';
+                font-size: 11px;
+                padding: 4px;
+            }
+        """)
+        summary_layout.addWidget(self.prompt_edit)
+        
+        # 模型選擇 + 產生按鈕
+        summary_action_layout = QHBoxLayout()
+        summary_action_layout.addWidget(QLabel("模型:"))
+        self.bedrock_model_combo = QComboBox()
+        self.bedrock_model_combo.addItems([
+            "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "anthropic.claude-3-5-haiku-20241022-v1:0",
+            "anthropic.claude-3-haiku-20240307-v1:0",
+        ])
+        summary_action_layout.addWidget(self.bedrock_model_combo)
+        
+        summary_action_layout.addWidget(QLabel("Region:"))
+        self.bedrock_region_input = QLineEdit()
+        self.bedrock_region_input.setPlaceholderText("預設使用 AWS CLI 設定")
+        self.bedrock_region_input.setFixedWidth(150)
+        summary_action_layout.addWidget(self.bedrock_region_input)
+        
+        self.generate_summary_btn = QPushButton("🤖 產生摘要")
+        self.generate_summary_btn.clicked.connect(self._generate_summary)
+        self.generate_summary_btn.setStyleSheet("""
+            QPushButton { background-color: #8e44ad; color: white; font-weight: bold; border-radius: 4px; padding: 6px 16px; }
+            QPushButton:hover { background-color: #7d3c98; }
+            QPushButton:disabled { background-color: #ccc; }
+        """)
+        summary_action_layout.addWidget(self.generate_summary_btn)
+        summary_action_layout.addStretch()
+        summary_layout.addLayout(summary_action_layout)
+        
+        # 摘要狀態
+        self.summary_status_label = QLabel("")
+        self.summary_status_label.setStyleSheet("color: #8e44ad; font-weight: bold;")
+        summary_layout.addWidget(self.summary_status_label)
+        
+        # 摘要結果
+        self.summary_output = QTextEdit()
+        self.summary_output.setReadOnly(True)
+        self.summary_output.setMinimumHeight(250)
+        self.summary_output.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #d4d4d4;
+                font-family: 'Monaco', 'Menlo', 'Courier New';
+                font-size: 12px;
+                border: none;
+                padding: 8px;
+            }
+        """)
+        summary_layout.addWidget(self.summary_output)
+        
+        # 儲存摘要按鈕
+        save_summary_layout = QHBoxLayout()
+        self.save_summary_btn = QPushButton("💾 儲存摘要")
+        self.save_summary_btn.clicked.connect(self._save_summary)
+        self.save_summary_btn.setEnabled(False)
+        save_summary_layout.addWidget(self.save_summary_btn)
+        save_summary_layout.addStretch()
+        summary_layout.addLayout(save_summary_layout)
+        
+        self.summary_group.setLayout(summary_layout)
+        layout.addWidget(self.summary_group)
     
     def _toggle_token_visibility(self):
         """切換 token 顯示/隱藏"""
@@ -487,6 +576,7 @@ class MainWindow(QMainWindow):
         # 載入字幕結果
         if output_file.endswith('.srt'):
             self._load_subtitles(output_file)
+            self.summary_group.setVisible(True)
         
         # 顯示完成訊息
         QMessageBox.information(
@@ -675,3 +765,70 @@ class MainWindow(QMainWindow):
             self.log_list.scrollToBottom()
         except Exception as e:
             QMessageBox.critical(self, "儲存失敗", f"無法儲存字幕:\n{e}")
+
+    # === 會議摘要功能 ===
+    
+    def _get_transcript_text(self):
+        """從 srt_segments 組合出純文字轉錄內容"""
+        lines = []
+        for seg in self.srt_segments:
+            lines.append(seg['text'])
+        return '\n'.join(lines)
+    
+    def _generate_summary(self):
+        """產生會議摘要"""
+        if not self.srt_segments:
+            QMessageBox.warning(self, "警告", "沒有轉錄結果可供摘要")
+            return
+        
+        transcript = self._get_transcript_text()
+        prompt_template = self.prompt_edit.toPlainText()
+        model_id = self.bedrock_model_combo.currentText()
+        region = self.bedrock_region_input.text().strip() or None
+        
+        self.generate_summary_btn.setEnabled(False)
+        self.summary_status_label.setText("⏳ 產生摘要中...")
+        self.summary_output.clear()
+        
+        self.summary_worker = SummaryWorker(
+            transcript=transcript,
+            prompt_template=prompt_template,
+            model_id=model_id,
+            region=region
+        )
+        self.summary_worker.progress.connect(self._on_summary_progress)
+        self.summary_worker.finished.connect(self._on_summary_finished)
+        self.summary_worker.error.connect(self._on_summary_error)
+        self.summary_worker.start()
+    
+    def _on_summary_progress(self, msg):
+        """摘要進度更新"""
+        self.summary_status_label.setText(msg)
+    
+    def _on_summary_finished(self, summary):
+        """摘要完成"""
+        self.summary_output.setPlainText(summary)
+        self.summary_status_label.setText("✓ 摘要產生完成")
+        self.generate_summary_btn.setEnabled(True)
+        self.save_summary_btn.setEnabled(True)
+    
+    def _on_summary_error(self, error_msg):
+        """摘要錯誤"""
+        self.summary_status_label.setText("✗ 摘要產生失敗")
+        self.summary_status_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+        self.generate_summary_btn.setEnabled(True)
+        QMessageBox.critical(self, "摘要錯誤", f"產生摘要時發生錯誤:\n\n{error_msg}")
+    
+    def _save_summary(self):
+        """儲存摘要到檔案"""
+        if not self.output_file:
+            return
+        
+        summary_path = Path(self.output_file).with_suffix('.summary.md')
+        try:
+            summary_path.write_text(self.summary_output.toPlainText(), encoding='utf-8')
+            self.log_list.addItem(f"✓ 摘要已儲存至 {summary_path}")
+            self.log_list.scrollToBottom()
+            QMessageBox.information(self, "已儲存", f"摘要已儲存至:\n{summary_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "儲存失敗", f"無法儲存摘要:\n{e}")
