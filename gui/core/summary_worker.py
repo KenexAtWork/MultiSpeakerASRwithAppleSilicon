@@ -36,7 +36,7 @@ class SummaryWorker(QThread):
     error = pyqtSignal(str)      # 錯誤
 
     def __init__(self, transcript, prompt_template=None,
-                 model_id="anthropic.claude-3-5-sonnet-20241022-v2:0",
+                 model_id="apac.anthropic.claude-3-5-sonnet-20241022-v2:0",
                  region=None):
         super().__init__()
         self.transcript = transcript
