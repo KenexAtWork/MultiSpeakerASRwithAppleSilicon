@@ -1,0 +1,20 @@
+{
+  "whisper": {
+    "asr_time": 11.041476964950562,
+    "diar_time": 7.732925176620483,
+    "total": 18.774402141571045,
+    "segments": 39,
+    "speakers": 2,
+    "text_len": 330,
+    "lang": "zh"
+  },
+  "qwen3": {
+    "asr_time": 18.232061862945557,
+    "diar_time": 6.403439998626709,
+    "total": 24.635501861572266,
+    "segments": 15,
+    "speakers": 2,
+    "text_len": 362,
+    "lang": "Chinese"
+  }
+}

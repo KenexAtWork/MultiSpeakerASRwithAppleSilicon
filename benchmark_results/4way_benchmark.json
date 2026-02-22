@@ -1,0 +1,50 @@
+{
+  "Whisper medium": {
+    "asr_time": 9.94,
+    "diar_time": 7.94,
+    "total": 17.88,
+    "asr_rtf": 0.166,
+    "total_rtf": 0.298,
+    "segments": 39,
+    "speakers": 2,
+    "text_len": 330,
+    "lang": "zh",
+    "ram": "~5-7 GB"
+  },
+  "Whisper base": {
+    "asr_time": 5.89,
+    "diar_time": 5.19,
+    "total": 11.07,
+    "asr_rtf": 0.098,
+    "total_rtf": 0.185,
+    "segments": 37,
+    "speakers": 2,
+    "text_len": 319,
+    "lang": "zh",
+    "ram": "~140 MB"
+  },
+  "Qwen3-ASR 0.6B": {
+    "asr_time": 17.6,
+    "diar_time": 6.15,
+    "total": 23.75,
+    "asr_rtf": 0.293,
+    "total_rtf": 0.396,
+    "segments": 15,
+    "speakers": 2,
+    "text_len": 362,
+    "lang": "Chinese",
+    "ram": "~1.2 GB"
+  },
+  "Qwen3-ASR 1.7B": {
+    "asr_time": 41.27,
+    "diar_time": 6.52,
+    "total": 47.79,
+    "asr_rtf": 0.688,
+    "total_rtf": 0.797,
+    "segments": 16,
+    "speakers": 2,
+    "text_len": 364,
+    "lang": "Chinese",
+    "ram": "~3.4 GB"
+  }
+}
