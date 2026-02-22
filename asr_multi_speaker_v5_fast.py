@@ -27,6 +27,7 @@ torch.load = _patched_load
 
 import mlx_whisper
 from pyannote.audio import Pipeline
+from merge_srt import merge_segments as merge_adjacent_segments
 
 def timestamp():
     """返回當前時間戳記"""
@@ -89,6 +90,8 @@ def extract_audio_to_wav(video_file):
             os.unlink(temp_wav_path)
         return None
 
+
+
 def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=None, skip_diarization=False, use_gpu=True, output_format="srt", model_size="medium"):
     """ASR 轉錄 + 說話者分離（加速版 + 記憶體優化）"""
     
@@ -122,7 +125,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     }
     model_path = model_map.get(model_size, model_map["medium"])
     
-    tprint(f"[1/2] 執行 ASR 轉錄（模型: {model_size}）...")
+    tprint(f"[1/3] 執行 ASR 轉錄（模型: {model_size}）...")
     tprint(f"⏳ 載入 Whisper 模型（首次使用需下載，約 1.5 GB）...")
     tprint(f"   模型路徑: {model_path}")
     
@@ -179,7 +182,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     temp_wav_path = None
     
     if not skip_diarization and hf_token:
-        tprint("[2/2] 執行說話者分離（加速版）...")
+        tprint("[2/3] 執行說話者分離（加速版）...")
         
         # 提取音訊
         tprint("⏳ 提取音訊為 WAV 格式...")
@@ -291,14 +294,14 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
         else:
             tprint("⚠ 無法提取音訊，將不標記說話者")
     else:
-        tprint("[2/2] 跳過說話者分離")
+        tprint("[2/3] 跳過說話者分離")
     
     # 記錄說話者分離階段時間
     diarization_end = time.time()
     stage_times['diarization'] = diarization_end - diarization_start
 
-    # Step 3: 合併結果
-    tprint(f"⏳ 合併轉錄結果（共 {len(segments)} 個段落）...")
+    # Step 3: 合併結果 + 合併相鄰同 speaker 段落
+    tprint(f"[3/3] 合併轉錄結果（共 {len(segments)} 個段落）...")
     all_segments = []
 
     for i, segment in enumerate(segments, 1):
@@ -319,7 +322,9 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
             'text': segment['text'].strip()
         })
     
-    tprint("✓ 合併完成")
+    raw_count = len(all_segments)
+    all_segments = merge_adjacent_segments(all_segments)
+    tprint(f"✓ 合併完成: {raw_count} → {len(all_segments)} 段")
 
     # Step 4: 寫入檔案
     tprint(f"⏳ 寫入檔案: {output_file} (格式: {output_format.upper()})...")
