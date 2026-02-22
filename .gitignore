@@ -59,3 +59,10 @@ config.local.json
 
 # Hugging Face cache
 .cache/
+
+# Visual test screenshots
+tests/visual/screenshots/*.png
+tests/visual/screenshots/*.jpg
+tests/visual/screenshots/*.json
+tests/visual/screenshots/*/
+!tests/visual/screenshots/.gitkeep

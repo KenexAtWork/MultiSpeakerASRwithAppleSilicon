@@ -387,12 +387,6 @@ class MainWindow(QMainWindow):
         self.bedrock_model_combo.setEditable(True)  # 允許手動輸入 profile ID
         summary_action_layout.addWidget(self.bedrock_model_combo)
         
-        self.refresh_models_btn = QPushButton("🔄")
-        self.refresh_models_btn.setFixedWidth(32)
-        self.refresh_models_btn.setToolTip("重新載入可用模型")
-        self.refresh_models_btn.clicked.connect(self._load_bedrock_models)
-        summary_action_layout.addWidget(self.refresh_models_btn)
-        
         summary_action_layout.addWidget(QLabel("Region:"))
         self.bedrock_region_combo = QComboBox()
         self.bedrock_region_combo.setFixedWidth(170)

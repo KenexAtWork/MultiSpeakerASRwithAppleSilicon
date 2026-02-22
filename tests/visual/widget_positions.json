@@ -1,0 +1,153 @@
+[
+  {
+    "type": "button",
+    "text": "選擇檔案...",
+    "x": 444,
+    "y": 271,
+    "visible": true,
+    "enabled": true
+  },
+  {
+    "type": "button",
+    "text": "顯示",
+    "x": 713,
+    "y": 417,
+    "visible": true,
+    "enabled": true
+  },
+  {
+    "type": "button",
+    "text": "儲存",
+    "x": 777,
+    "y": 417,
+    "visible": true,
+    "enabled": true
+  },
+  {
+    "type": "button",
+    "text": "開始轉錄",
+    "x": 444,
+    "y": 485,
+    "visible": true,
+    "enabled": false
+  },
+  {
+    "type": "button",
+    "text": "開啟輸出資料夾",
+    "x": 133,
+    "y": 887,
+    "visible": true,
+    "enabled": false
+  },
+  {
+    "type": "button",
+    "text": "▶ 播放",
+    "x": 92,
+    "y": 301,
+    "visible": false,
+    "enabled": true
+  },
+  {
+    "type": "button",
+    "text": "⏹ 停止",
+    "x": 92,
+    "y": 301,
+    "visible": false,
+    "enabled": true
+  },
+  {
+    "type": "button",
+    "text": "💾 儲存修改",
+    "x": 372,
+    "y": 301,
+    "visible": false,
+    "enabled": false
+  },
+  {
+    "type": "button",
+    "text": "🔄",
+    "x": 68,
+    "y": 301,
+    "visible": false,
+    "enabled": true
+  },
+  {
+    "type": "button",
+    "text": "🤖 產生摘要",
+    "x": 372,
+    "y": 301,
+    "visible": false,
+    "enabled": true
+  },
+  {
+    "type": "button",
+    "text": "💾 儲存摘要",
+    "x": 372,
+    "y": 301,
+    "visible": false,
+    "enabled": false
+  },
+  {
+    "type": "combobox",
+    "text": "zh (中文)",
+    "current": "zh (中文)",
+    "x": 194,
+    "y": 371,
+    "visible": true,
+    "enabled": true
+  },
+  {
+    "type": "combobox",
+    "text": "tiny (~1-2 GB)",
+    "current": "tiny (~1-2 GB)",
+    "x": 404,
+    "y": 371,
+    "visible": true,
+    "enabled": true
+  },
+  {
+    "type": "combobox",
+    "text": "SRT",
+    "current": "SRT",
+    "x": 582,
+    "y": 371,
+    "visible": true,
+    "enabled": true
+  },
+  {
+    "type": "combobox",
+    "text": "",
+    "current": "",
+    "x": 202,
+    "y": 77,
+    "visible": false,
+    "enabled": true
+  },
+  {
+    "type": "combobox",
+    "text": "us-east-1 (維吉尼亞)",
+    "current": "us-east-1 (維吉尼亞)",
+    "x": 137,
+    "y": 301,
+    "visible": false,
+    "enabled": true
+  },
+  {
+    "type": "checkbox",
+    "text": "跳過說話者分離",
+    "checked": true,
+    "x": 145,
+    "y": 416,
+    "visible": true,
+    "enabled": true
+  },
+  {
+    "type": "checkbox",
+    "text": "GPU 加速",
+    "checked": false,
+    "x": 246,
+    "y": 416,
+    "visible": true,
+    "enabled": true
+  }
+]
