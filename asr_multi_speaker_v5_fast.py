@@ -114,6 +114,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
     tprint(f"GPU 加速: {'啟用 (MPS)' if use_gpu else '停用 (CPU)'}")
     tprint("=" * 60)
 
+    # auto 語言偵測：傳 None 給 Whisper
+    if language and language.lower() == "auto":
+        language = None
+
     # Step 1: ASR 轉錄
     asr_start = time.time()
     model_map = {
