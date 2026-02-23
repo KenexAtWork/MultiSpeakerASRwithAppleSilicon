@@ -103,6 +103,13 @@ class MainWindow(QMainWindow):
         self.audio_output.setVolume(1.0)
         self.player.positionChanged.connect(self._on_player_position_changed)
         self.player.playbackStateChanged.connect(self._on_playback_state_changed)
+        self.player.errorOccurred.connect(self._on_player_error)
+
+    def _on_player_error(self, error, error_string=""):
+        """播放器錯誤處理"""
+        print(f"[Player Error] {error}: {error_string}")
+        print(f"[Player Source] {self.player.source().toString()}")
+        print(f"[Player Media Status] {self.player.mediaStatus()}")
     
     def init_ui(self):
         """初始化 UI"""
@@ -800,7 +807,11 @@ class MainWindow(QMainWindow):
                 self.player.durationChanged.disconnect(self._on_duration_changed)
             except TypeError:
                 pass
-            self.player.setSource(QUrl.fromLocalFile(self.current_file))
+            abs_path = os.path.abspath(self.current_file)
+            url = QUrl.fromLocalFile(abs_path)
+            print(f"[Player] Loading: {abs_path}")
+            print(f"[Player] URL: {url.toString()}")
+            self.player.setSource(url)
             self.player.durationChanged.connect(self._on_duration_changed)
     
     def _ms_to_time_str(self, ms):
