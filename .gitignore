@@ -30,10 +30,16 @@ venv_arm64/
 
 # 輸出檔案
 *_transcription*.txt
+*_transcription*.srt
 *.log
 all_processing.log
 all_v5_fast.log
 all_full_run.log
+
+# Benchmark 結果（保留 .csv 和 README）
+benchmark_results/*.srt
+benchmark_results/*.json
+benchmark_input.*
 
 # 測試檔案
 test_*.txt
@@ -43,6 +49,11 @@ all.mp4
 *.mp4
 *.wav
 *.mp3
+*.m4a
+
+# 測試輸出
+scripts/test_*.py
+tests/visual/screenshots/
 
 # 但允許 examples 目錄中的範例檔案
 !examples/*.mp4
@@ -56,6 +67,7 @@ all.mp4
 .env
 config.local.json
 *_local.*
+GITLAB_SETUP.md
 
 # Hugging Face cache
 .cache/
