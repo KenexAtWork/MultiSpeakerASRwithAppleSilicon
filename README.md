@@ -2,6 +2,23 @@
 
 使用 MLX Whisper 和 pyannote.audio 進行語音轉錄和說話者分離的工具，針對 Apple Silicon (M1/M2/M3) Mac 優化。
 
+## 📦 專案同步
+
+本專案同時維護在 GitHub 和 GitLab：
+
+- **GitHub**: https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon
+- **GitLab** (AWS 內部): https://gitlab.aws.dev/yushengh/MacMultiSpeakerASR
+
+### 同步到 GitLab
+
+```bash
+# 需要連接 AWS VPN
+./sync_to_gitlab.sh
+
+# 或同步到所有 remotes (GitHub + GitLab)
+./sync_all.sh
+```
+
 ## 🎯 使用方式
 
 ### 圖形界面版本（推薦）
