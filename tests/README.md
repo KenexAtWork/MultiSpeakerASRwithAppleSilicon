@@ -13,12 +13,14 @@
 ```bash
 cd asr
 
-# 快速測試（跳過 diarization，約 16 秒）
+# 快速測試（跳過 diarization，約 20 秒）
 .venv/bin/python tests/test_pipeline_e2e.py --fast
 .venv/bin/python tests/test_merge_srt.py
 .venv/bin/python tests/test_gui_media_url.py
+.venv/bin/python tests/test_srt_parser.py
+.venv/bin/python tests/test_error_handling.py
 
-# 完整測試（含 diarization，約 50 秒）
+# 完整測試（含 diarization，約 60 秒）
 .venv/bin/python tests/test_pipeline_e2e.py
 ```
 
@@ -93,6 +95,46 @@ cd asr
 - 實際暫存檔案 round-trip
 - QMediaPlayer 接受中文 URL
 - 實際音檔載入
+
+#### 4. SRT 解析測試 (`test_srt_parser.py`)
+
+測試 GUI 中的 SRT 解析邏輯。
+
+```bash
+.venv/bin/python tests/test_srt_parser.py
+```
+
+**測試項目：**
+- 基本 SRT 格式解析
+- 多行文字處理
+- 時間戳轉換正確性
+- 中文字元處理
+- 空檔案處理
+- 格式錯誤的時間戳
+- 缺少文字內容
+- 額外空行處理
+- time_str 欄位保留
+- 實際 SRT 檔案測試
+- 特殊字元處理
+- 零時長段落
+
+#### 5. 錯誤處理測試 (`test_error_handling.py`)
+
+測試 ASR Pipeline 在各種錯誤情況下的行為。
+
+```bash
+.venv/bin/python tests/test_error_handling.py
+```
+
+**測試項目：**
+- 檔案不存在時應報錯
+- 無效的模型名稱
+- 無效的語言代碼
+- 沒有 HF token 但要求 diarization
+- 無效的輸出格式
+- 輸出到唯讀目錄
+- 損壞的影片檔案
+- 空的影片檔案
 
 ## 測試環境需求
 
