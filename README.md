@@ -91,23 +91,6 @@ cp .env.example .env
 
 詳細使用說明請參考 [GUI 使用說明](gui/README.md)。
 
-## 📦 專案同步
-
-本專案同時維護在 GitHub 和 GitLab：
-
-- **GitHub**: https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon
-- **GitLab** (AWS 內部): https://gitlab.aws.dev/yushengh/MacMultiSpeakerASR
-
-### 同步到 GitLab
-
-```bash
-# 需要連接 AWS VPN
-./sync_to_gitlab.sh
-
-# 或同步到所有 remotes (GitHub + GitLab)
-./sync_all.sh
-```
-
 ## 💻 系統需求
 
 - macOS (Apple Silicon: M1/M2/M3)
