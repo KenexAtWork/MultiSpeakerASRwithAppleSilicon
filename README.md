@@ -1,6 +1,6 @@
 # ASR Multi-Speaker Transcription
 
-🎙️ 使用 MLX Whisper 和 pyannote.audio 進行語音轉錄和說話者分離的工具，針對 Apple Silicon (M1/M2/M3) Mac 優化。
+🎙️ 使用 MLX Whisper 和 pyannote.audio 進行語音轉錄和說話者分離的工具，針對 Apple Silicon Mac 優化。
 
 提供友善的圖形界面，支援拖放檔案、即時進度顯示、字幕編輯等功能。
 
@@ -93,7 +93,7 @@ cp .env.example .env
 
 ## 💻 系統需求
 
-- macOS (Apple Silicon: M1/M2/M3)
+- macOS with Apple Silicon (M-series chips: M1, M2, M3, M4 或更新)
 - Python 3.10+
 - ffmpeg
 - Hugging Face 帳號（用於說話者分離）
@@ -457,7 +457,7 @@ asr/
 | **硬體優化** | Apple Silicon (MPS) | NVIDIA GPU (CUDA) |
 | **使用介面** | GUI + 命令列 | 命令列 |
 | **時間戳精度** | ±0.1-0.5 秒 | ±0.01-0.05 秒（強制對齊） |
-| **跨平台** | 僅 macOS (M1/M2/M3) | Linux, Windows, macOS |
+| **跨平台** | 僅 macOS (Apple Silicon) | Linux, Windows, macOS |
 | **處理速度** | 快（M1 原生） | 非常快（CUDA） |
 | **功能** | ASR + 說話人分離 + 字幕編輯 | ASR + 說話人分離 + 翻譯 + 批次 |
 | **安裝** | 簡單 | 中等 |
