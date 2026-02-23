@@ -27,6 +27,20 @@ jobs:
         # 安裝測試所需的最小依賴
         pip install pytest
     
+    - name: Debug - Show directory structure
+      run: |
+        echo "Current directory:"
+        pwd
+        echo ""
+        echo "Directory contents:"
+        ls -la
+        echo ""
+        echo "Looking for asr directory:"
+        find . -name "asr" -type d
+        echo ""
+        echo "Looking for test files:"
+        find . -name "test_*.py" | head -5
+    
     - name: Run logic tests (no MLX required)
       run: |
         # 不要 cd 到 asr，直接從 repo 根目錄執行
