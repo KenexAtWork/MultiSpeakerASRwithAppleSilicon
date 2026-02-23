@@ -1,0 +1,40 @@
+# 輕量級測試 - 不需要 MLX/Apple Silicon
+# 只測試不依賴硬體的邏輯部分
+
+name: Tests (Lite)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-lite:
+    runs-on: ubuntu-latest  # 使用 Linux，更快更便宜
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install test dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+    
+    - name: Run logic tests (no MLX required)
+      run: |
+        cd asr
+        # 只執行不需要 MLX 的測試
+        python tests/test_merge_srt.py
+        python tests/test_srt_parser.py
+    
+    - name: Test summary
+      if: always()
+      run: |
+        echo "✅ 邏輯測試完成"
+        echo "⚠️  完整測試（含 MLX）請在本地執行: ./run_tests.sh"
