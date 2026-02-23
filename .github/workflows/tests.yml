@@ -1,0 +1,57 @@
+name: ASR Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: macos-latest  # 需要 macOS 因為使用 MLX (Apple Silicon)
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install system dependencies
+      run: |
+        brew install ffmpeg
+    
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r gui/requirements.txt
+    
+    - name: Run tests (fast mode)
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: |
+        cd asr
+        python tests/test_merge_srt.py
+        python tests/test_srt_parser.py
+        python tests/test_error_handling.py
+        python tests/test_pipeline_e2e.py --fast
+        python tests/test_gui_media_url.py
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          asr/tests/*.log
+          asr/tests/visual/screenshots/

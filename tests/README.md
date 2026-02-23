@@ -8,7 +8,29 @@
 
 ## 快速開始
 
-### 執行所有測試
+### 一鍵執行所有測試
+
+```bash
+cd asr
+
+# 快速模式（推薦，約 20 秒）
+./run_tests.sh --fast
+
+# 完整模式（含 diarization，約 60 秒）
+./run_tests.sh
+
+# 只執行特定測試
+./run_tests.sh --test pipeline
+./run_tests.sh --test merge
+
+# 顯示詳細輸出
+./run_tests.sh --fast --verbose
+
+# 查看所有選項
+./run_tests.sh --help
+```
+
+### 手動執行個別測試
 
 ```bash
 cd asr
@@ -179,23 +201,34 @@ ASR Pipeline 端到端測試 (model=base)
 
 ## 持續整合
 
-測試可整合到 CI/CD pipeline：
+### 本地 CI 測試
 
 ```bash
-#!/bin/bash
-# ci_test.sh
-
-set -e
-
 cd asr
-
-# 快速測試（適合 PR 檢查）
-.venv/bin/python tests/test_pipeline_e2e.py --fast
-.venv/bin/python tests/test_merge_srt.py
-.venv/bin/python tests/test_gui_media_url.py
-
-echo "✓ 所有測試通過"
+./ci_test.sh
 ```
+
+這個腳本會：
+- 檢查環境和依賴
+- 執行所有測試（快速模式）
+- 產生測試報告
+- 適用於任何 CI/CD 系統
+
+### GitHub Actions
+
+專案包含 `.github/workflows/tests.yml` 配置檔案，會在以下情況自動執行測試：
+- Push 到 main 或 develop 分支
+- 建立 Pull Request
+
+需要在 GitHub repository settings 中設定 `HF_TOKEN` secret。
+
+### 測試腳本說明
+
+| 腳本 | 用途 | 執行時間 |
+|------|------|---------|
+| `run_tests.sh` | 本地開發測試，支援多種選項 | 20-60秒 |
+| `ci_test.sh` | CI/CD 自動化測試，簡化輸出 | ~20秒 |
+| `.github/workflows/tests.yml` | GitHub Actions 配置 | ~20秒 |
 
 ## 新增測試
 
