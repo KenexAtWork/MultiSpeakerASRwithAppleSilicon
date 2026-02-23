@@ -1,6 +1,95 @@
 # ASR Multi-Speaker Transcription
 
-使用 MLX Whisper 和 pyannote.audio 進行語音轉錄和說話者分離的工具，針對 Apple Silicon (M1/M2/M3) Mac 優化。
+🎙️ 使用 MLX Whisper 和 pyannote.audio 進行語音轉錄和說話者分離的工具，針對 Apple Silicon (M1/M2/M3) Mac 優化。
+
+提供友善的圖形界面，支援拖放檔案、即時進度顯示、字幕編輯等功能。
+
+![GUI Screenshot](examples/sample-output/gui-screenshot.png)
+
+## ✨ 主要特色
+
+- 🖥️ **友善的圖形界面** - 拖放檔案、即時進度、字幕編輯
+- ⚡ **Apple Silicon 優化** - 使用 MLX 和 MPS GPU 加速，處理速度快 6 倍
+- 🎯 **說話者分離** - 自動識別不同說話者並標記
+- 🌏 **多語言支援** - 支援中文、英文、日文等多種語言
+- 📝 **字幕編輯** - 內建字幕編輯器，可即時修改並儲存
+- 🎵 **音訊播放** - 同步播放音訊，點擊字幕跳轉
+- 💾 **多種格式** - 輸出 SRT 或 TXT 格式
+
+## 🚀 快速開始
+
+### 1. 安裝
+
+```bash
+# 安裝系統依賴（如果還沒安裝）
+brew install ffmpeg uv
+
+# Clone 專案
+git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
+cd MultiSpeakerASRwithAppleSilicon
+
+# 建立虛擬環境並安裝套件
+uv venv --python 3.10
+source .venv/bin/activate
+uv pip install -e .
+```
+
+### 2. 設定 Hugging Face Token
+
+說話者分離功能需要 Hugging Face token：
+
+1. 前往 https://huggingface.co/settings/tokens 建立 token
+2. 接受模型使用條款：
+   - https://huggingface.co/pyannote/speaker-diarization-3.1
+   - https://huggingface.co/pyannote/segmentation-3.0
+3. 複製 `.env.example` 為 `.env` 並填入 token：
+
+```bash
+cp .env.example .env
+# 編輯 .env，填入: HF_TOKEN=your_huggingface_token_here
+```
+
+**詳細申請教學：** [如何申請 Hugging Face Token](https://ithelp.ithome.com.tw/articles/10389679)
+
+### 3. 啟動 GUI
+
+```bash
+./run_gui.sh
+```
+
+第一次執行會自動下載模型（約 1.7 GB），需要 5-15 分鐘。
+
+## 🎯 使用 GUI
+
+### 基本流程
+
+1. **選擇檔案** - 拖放影片/音訊檔案，或點擊「選擇檔案」按鈕
+2. **設定參數** - 選擇 Whisper 模型、語言、輸出格式
+3. **開始轉錄** - 點擊「開始轉錄」按鈕
+4. **查看結果** - 轉錄完成後，字幕會顯示在下方
+5. **編輯字幕** - 雙擊字幕可編輯，修改後點擊「儲存 SRT」
+6. **播放音訊** - 點擊字幕可跳轉到對應時間點
+
+### 參數說明
+
+| 參數 | 說明 | 建議值 |
+|------|------|--------|
+| **Whisper 模型** | 影響準確度和速度 | `medium`（預設）或 `small` |
+| **語言** | 音訊主要語言 | `auto`（自動偵測）或 `zh`（中文） |
+| **輸出格式** | 字幕檔案格式 | `SRT`（標準字幕格式） |
+| **說話者分離** | 是否識別不同說話者 | 勾選（預設） |
+| **Region** | AWS 區域（摘要功能用） | `us-west-2` |
+
+### 功能說明
+
+- **拖放檔案** - 支援 mp4, m4a, mov, avi, mkv, wav, mp3 等格式
+- **即時進度** - 顯示處理階段和進度百分比
+- **日誌顯示** - 即時顯示處理過程和錯誤訊息
+- **字幕編輯** - 雙擊字幕可編輯內容，支援多行文字
+- **音訊播放** - 同步播放音訊，點擊字幕跳轉到對應時間
+- **開啟資料夾** - 快速開啟輸出檔案所在資料夾
+
+詳細使用說明請參考 [GUI 使用說明](gui/README.md)。
 
 ## 📦 專案同步
 
@@ -19,158 +108,27 @@
 ./sync_all.sh
 ```
 
-## 🎯 使用方式
-
-### 圖形界面版本（推薦）
-
-```bash
-# 啟動 GUI 應用
-./run_gui.sh
-```
-
-提供友善的圖形界面，支援拖放檔案、即時進度顯示等功能。詳見 [GUI 使用說明](gui/README.md)。
-
-### 命令列版本
-
-```bash
-# 基本使用
-./asr.sh video.mp4
-
-# 指定模型大小
-./asr.sh video.mp4 --model small
-```
-
-## 功能特色
-
-- ✅ 使用 MLX Whisper 進行高效能 ASR 轉錄（Apple Silicon 原生加速）
-- ✅ 使用 pyannote.audio 進行說話者分離
-- ✅ 支援 MPS (Metal Performance Shaders) GPU 加速
-- ✅ 多執行緒優化，充分利用 M1/M2/M3 效能核心
-- ✅ 自動處理影片音訊提取
-- ✅ 支援多種語言（中文、英文、日文等）
-- ✅ 圖形界面版本（PyQt6）- 拖放檔案、即時進度、日誌顯示
-
-## 系統需求
+## 💻 系統需求
 
 - macOS (Apple Silicon: M1/M2/M3)
 - Python 3.10+
 - ffmpeg
 - Hugging Face 帳號（用於說話者分離）
+- 至少 8GB RAM（建議 16GB）
 
-## 安裝
+## 📖 範例與測試
 
-### 方式一：從頭開始安裝
-
-#### 1. 安裝系統依賴
-
-```bash
-# 安裝 Homebrew（如果還沒安裝）
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# 安裝 ffmpeg
-brew install ffmpeg
-
-# 安裝 uv（Python 套件管理工具）
-brew install uv
-```
-
-#### 2. Clone 專案並建立環境
+專案包含範例影片和預先處理好的輸出結果：
 
 ```bash
-# Clone 專案
-git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
-cd MultiSpeakerASRwithAppleSilicon
+# 使用範例影片測試
+./run_gui.sh
+# 然後拖放 examples/sample-01.mp4 到 GUI
 
-# 使用 uv 建立虛擬環境（自動下載 Python 3.10）
-uv venv --python 3.10
-
-# 啟動環境
-source .venv/bin/activate
-
-# 安裝 Python 套件
-uv pip install mlx-whisper pyannote-audio
-
-# （可選）安裝 GUI 版本所需套件
-uv pip install PyQt6
-```
-
-#### 3. 設定 Hugging Face Token
-
-說話者分離功能需要 Hugging Face token：
-
-1. 前往 https://huggingface.co/settings/tokens 建立 token
-2. 接受模型使用條款：
-   - https://huggingface.co/pyannote/speaker-diarization-3.1
-   - https://huggingface.co/pyannote/segmentation-3.0
-3. 設定 token（三種方式任選一種）：
-
-**方式 A：使用 .env 檔案（推薦）**
-```bash
-# 複製範例檔案
-cp .env.example .env
-
-# 編輯 .env 並填入你的 token
-# HF_TOKEN=your_huggingface_token_here
-```
-
-**方式 B：設定環境變數**
-```bash
-export HF_TOKEN=your_huggingface_token_here
-```
-
-**方式 C：執行時指定**
-```bash
-./asr.sh video.mp4 --hf-token your_huggingface_token_here
-```
-
-**詳細申請教學：** [如何申請 Hugging Face Token](https://ithelp.ithome.com.tw/articles/10389679)
-
-### 方式二：快速安裝（已有 uv）
-
-如果你已經安裝了 uv 和 ffmpeg：
-
-```bash
-git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
-cd MultiSpeakerASRwithAppleSilicon
-uv venv --python 3.10
-source .venv/bin/activate
-uv pip install mlx-whisper pyannote-audio
-export HF_TOKEN=your_huggingface_token_here
-```
-
-## 首次使用注意事項
-
-**⚠️ 第一次執行時會自動下載模型，需要較長時間和網路流量：**
-
-1. **MLX Whisper 模型**（約 1.5 GB）
-   - 模型：`mlx-community/whisper-medium-mlx`
-   - 下載時間：視網速而定，通常需要 5-15 分鐘
-   - 儲存位置：`~/.cache/huggingface/`
-
-2. **Pyannote 說話者分離模型**（約 200 MB）
-   - 模型：`pyannote/speaker-diarization-3.1` 和 `pyannote/segmentation-3.0`
-   - 需要有效的 HF_TOKEN
-   - 儲存位置：`~/.cache/torch/`
-
-**總下載量：約 1.7 GB**
-
-**建議：**
-- 首次使用時確保網路連線穩定
-- 用較短的測試影片（1-2 分鐘）進行首次測試
-- 模型下載完成後，後續使用就不需要再下載了
-
-## 使用方式
-
-### 快速開始：使用範例影片
-
-```bash
-# 使用提供的範例影片測試
+# 或使用命令列測試
 ./asr.sh examples/sample-01.mp4
 
-# 查看輸出結果
-cat examples/sample-01_transcription.srt
-
-# 或查看範例輸出（已預先處理好）
+# 查看範例輸出
 cat examples/sample-output/sample-01_transcription.srt
 ```
 
@@ -180,92 +138,7 @@ cat examples/sample-output/sample-01_transcription.srt
 
 詳細說明請參考 [examples/README.md](examples/README.md)
 
-### 方法 1：使用便捷腳本（推薦）
-
-```bash
-# 基本使用（自動產生輸出檔名，預設 SRT 格式）
-./asr.sh video.mp4
-
-# 指定輸出檔名
-./asr.sh video.mp4 output.srt
-
-# 輸出為 TXT 格式
-./asr.sh video.mp4 output.txt --format txt
-
-# 指定語言
-./asr.sh video.mp4 output.srt --language en
-
-# 選擇 Whisper 模型大小（預設：medium）
-./asr.sh video.mp4 output.srt --model small   # 記憶體使用 ~3-4 GB
-./asr.sh video.mp4 output.srt --model base    # 記憶體使用 ~2-3 GB
-./asr.sh video.mp4 output.srt --model large   # 記憶體使用 ~8-10 GB
-
-# 只做 ASR 轉錄（跳過說話者分離）
-./asr.sh video.mp4 output.srt --skip-diarization
-
-# 使用 CPU 而非 GPU
-./asr.sh video.mp4 output.srt --no-gpu
-
-# 自訂 HF token
-./asr.sh video.mp4 output.srt --hf-token YOUR_TOKEN
-```
-
-### 方法 2：直接執行 Python 腳本
-
-```bash
-source .venv/bin/activate
-
-# 輸出 SRT 格式（預設）
-python asr_multi_speaker_v5_fast.py \
-  --input video.mp4 \
-  --output output.srt \
-  --language zh \
-  --hf-token YOUR_TOKEN
-
-# 輸出 TXT 格式
-python asr_multi_speaker_v5_fast.py \
-  --input video.mp4 \
-  --output output.txt \
-  --format txt \
-  --language zh \
-  --hf-token YOUR_TOKEN
-```
-
-## 支援的語言
-
-- `zh`: 中文
-- `en`: 英文
-- `ja`: 日文
-- `es`: 西班牙文
-- `fr`: 法文
-- `de`: 德文
-- `it`: 義大利文
-- `pt`: 葡萄牙文
-- `ru`: 俄文
-- `ko`: 韓文
-
-### 語言混合支援
-
-MLX Whisper 可以處理語言混合的音訊（如中英混雜），有兩種方式：
-
-**方法 1：自動偵測（推薦用於混合語言）**
-```bash
-# 不指定 --language，讓 Whisper 自動偵測
-./asr.sh video.mp4 output.txt
-```
-
-**方法 2：指定主要語言**
-```bash
-# 指定主要語言（如果音訊以中文為主）
-./asr.sh video.mp4 output.txt --language zh
-```
-
-**注意：**
-- 如果指定語言，Whisper 會用該語言模型處理整段音訊
-- 對於中英混雜的音訊，建議不指定語言，讓它自動偵測
-- 英文部分可能會被正確識別，也可能被轉成拼音（取決於比例）
-
-## 模型選擇
+## 🎨 模型選擇
 
 MLX Whisper 支援多種模型大小，可根據記憶體和準確度需求選擇：
 
@@ -277,37 +150,50 @@ MLX Whisper 支援多種模型大小，可根據記憶體和準確度需求選�
 | `medium` | ~5-7 GB | ⭐⭐⭐⭐⭐ | 中等 | 預設值、高品質需求 |
 | `large` | ~8-10 GB | ⭐⭐⭐⭐⭐ | 較慢 | 最高準確度需求 |
 
-**使用範例：**
-```bash
-# 使用 small 模型（推薦用於 8GB 記憶體的 Mac）
-./asr.sh video.mp4 --model small
-
-# 使用 base 模型（最省記憶體）
-./asr.sh video.mp4 --model base
-
-# 使用 large 模型（最高準確度）
-./asr.sh video.mp4 --model large
-```
-
 **選擇建議：**
 - 8GB RAM Mac：推薦 `small` 或 `base`
 - 16GB RAM Mac：推薦 `small` 或 `medium`（預設）
 - 32GB+ RAM Mac：可使用 `large`
 - 中英混合語音：建議至少使用 `small` 以上
 
-## 效能
+## 🌏 語言支援
 
-在 M1 Pro (8 核心 CPU, 14 核心 GPU) 上的測試結果：
+支援多種語言，包括：
 
-| 影片長度 | 處理時間 | 加速比 |
-|---------|---------|--------|
-| 90 秒   | ~45 秒  | 2x     |
-| 3 分鐘  | ~55 秒  | 3.3x   |
-| 31 分鐘 | ~10 分鐘 | 3.1x   |
+- `auto`: 自動偵測（推薦用於混合語言）
+- `zh`: 中文
+- `en`: 英文
+- `ja`: 日文
+- `es`: 西班牙文
+- `fr`: 法文
+- `de`: 德文
+- `it`: 義大利文
+- `pt`: 葡萄牙文
+- `ru`: 俄文
+- `ko`: 韓文
 
-使用 GPU 加速比 CPU 快約 6 倍。
+**語言混合支援：**
+- 對於中英混雜的音訊，建議選擇 `auto`（自動偵測）
+- 如果音訊以某種語言為主，可指定該語言
+- Whisper 可以處理語言混合的音訊，但準確度取決於混合比例
 
-## 輸出格式
+## ⚡ 效能表現
+
+在 M1 Pro (8 核心 CPU, 14 核心 GPU, 16GB RAM) 上的測試結果：
+
+| 影片長度 | 處理時間 | 加速比 | 模型 |
+|---------|---------|--------|------|
+| 90 秒   | ~45 秒  | 2.0x   | medium |
+| 3 分鐘  | ~55 秒  | 3.3x   | medium |
+| 14 分鐘 | ~4.5 分鐘 | 3.1x | medium |
+| 31 分鐘 | ~10 分鐘 | 3.1x   | medium |
+
+**效能優化：**
+- 使用 GPU 加速比 CPU 快約 6 倍
+- 使用 `small` 模型可進一步提升速度（約 1.5 倍）
+- 關閉說話者分離可節省約 30% 時間
+
+## 📝 輸出格式
 
 ### SRT 格式（預設）
 
@@ -325,10 +211,6 @@ MLX Whisper 支援多種模型大小，可根據記憶體和準確度需求選�
 3
 00:00:06,239 --> 00:00:06,639
 [SPEAKER_01] 好
-
-4
-00:00:07,359 --> 00:00:09,960
-[SPEAKER_01] 各位同事大家好
 ```
 
 ### TXT 格式
@@ -344,36 +226,91 @@ MLX Whisper 支援多種模型大小，可根據記憶體和準確度需求選�
 
 [SPEAKER_01] 00:00:06,239 --> 00:00:06,639
 好
-
-[SPEAKER_01] 00:00:07,359 --> 00:00:09,960
-各位同事大家好
 ```
 
-使用 `--format txt` 參數可切換為 TXT 格式。
+## 🔧 進階使用：命令列版本
 
-## 疑難排解
-[SPEAKER_00] 00:00:00,000 --> 00:00:02,500
-請 Peter 這邊來做說明
+如果你偏好使用命令列，或需要批次處理，可以使用命令列版本：
 
-[SPEAKER_00] 00:00:02,500 --> 00:00:04,200
-那我先把交給 Peter
+### 使用便捷腳本
 
-[SPEAKER_01] 00:00:06,239 --> 00:00:06,639
-好
+```bash
+# 基本使用（自動產生輸出檔名）
+./asr.sh video.mp4
 
-[SPEAKER_01] 00:00:07,359 --> 00:00:09,960
-各位同事大家好
+# 指定輸出檔名和格式
+./asr.sh video.mp4 output.srt
+./asr.sh video.mp4 output.txt --format txt
+
+# 指定語言和模型
+./asr.sh video.mp4 output.srt --language zh --model small
+
+# 跳過說話者分離（更快）
+./asr.sh video.mp4 output.srt --skip-diarization
+
+# 使用 CPU（不使用 GPU）
+./asr.sh video.mp4 output.srt --no-gpu
 ```
 
-## 疑難排解
+### 直接執行 Python 腳本
 
-### 問題：找不到 ffmpeg
+```bash
+source .venv/bin/activate
 
+python asr_multi_speaker_v5_fast.py \
+  --input video.mp4 \
+  --output output.srt \
+  --language zh \
+  --model medium \
+  --hf-token YOUR_TOKEN
+```
+
+### 批次處理範例
+
+```bash
+# 處理資料夾中的所有影片
+for video in videos/*.mp4; do
+  ./asr.sh "$video"
+done
+```
+
+## ❓ 疑難排解
+
+### GUI 相關問題
+
+**問題：GUI 無法啟動**
+```bash
+# 確認已安裝 PyQt6
+source .venv/bin/activate
+uv pip install PyQt6
+
+# 檢查 Python 版本（需要 3.10+）
+python --version
+```
+
+**問題：拖放檔案無反應**
+- 確認檔案格式支援（mp4, m4a, mov, avi, mkv, wav, mp3）
+- 檢查檔案路徑中是否有特殊字元
+- 查看日誌視窗是否有錯誤訊息
+
+**問題：音訊無法播放**
+- 確認檔案路徑正確
+- 檢查是否有中文或特殊字元（已支援，但可能需要重新選擇檔案）
+- 查看日誌視窗的錯誤訊息
+
+**問題：字幕編輯後無法儲存**
+- 確認有寫入權限
+- 檢查輸出路徑是否存在
+- 嘗試手動指定輸出檔名
+
+### 轉錄相關問題
+
+**問題：找不到 ffmpeg**
 ```bash
 brew install ffmpeg
 ```
 
-### 問題：找不到 mlx 模組
+**問題：找不到 mlx 模組**
 
 確認使用 ARM64 原生 Python：
 
@@ -386,64 +323,166 @@ file $(which python)
 
 ```bash
 uv venv --python 3.10
+source .venv/bin/activate
+uv pip install -e .
 ```
 
-### 問題：說話者分離失敗
+**問題：說話者分離失敗**
 
-1. 確認已設定 HF_TOKEN
-2. 確認已接受模型使用條款
-3. 嘗試使用 `--no-gpu` 參數
+1. 確認已設定 HF_TOKEN（在 .env 檔案或 GUI 中）
+2. 確認已接受模型使用條款：
+   - https://huggingface.co/pyannote/speaker-diarization-3.1
+   - https://huggingface.co/pyannote/segmentation-3.0
+3. 嘗試取消勾選「說話者分離」選項
+4. 檢查網路連線（首次使用需下載模型）
 
-### 問題：處理速度慢
+**問題：處理速度慢**
 
 1. 確認使用 GPU 加速（預設啟用）
-2. 檢查 CPU 執行緒數設定（預設 8）
-3. 關閉其他耗資源的應用程式
+2. 嘗試使用較小的模型（`small` 或 `base`）
+3. 取消勾選「說話者分離」可節省約 30% 時間
+4. 關閉其他耗資源的應用程式
 
-## 專案結構
+**問題：記憶體不足**
+
+1. 使用較小的模型：`small` (3-4 GB) 或 `base` (2-3 GB)
+2. 取消勾選「說話者分離」
+3. 關閉其他應用程式釋放記憶體
+4. 考慮升級 RAM（建議 16GB）
+
+**問題：轉錄結果不準確**
+
+1. 嘗試使用較大的模型（`medium` 或 `large`）
+2. 確認語言設定正確（或使用 `auto`）
+3. 檢查音訊品質（背景噪音、音量）
+4. 對於中英混合，使用 `auto` 語言設定
+
+**問題：首次執行很慢**
+
+第一次執行會下載模型（約 1.7 GB），需要 5-15 分鐘。模型下載完成後，後續使用就會很快。
+
+### 測試相關問題
+
+**問題：測試失敗**
+
+```bash
+# 執行測試診斷
+cd asr
+./run_tests.sh --fast --verbose
+
+# 檢查環境
+source .venv/bin/activate
+python -c "import mlx_whisper; print('MLX OK')"
+python -c "import PyQt6; print('PyQt6 OK')"
+```
+
+## 🧪 測試與開發
+
+### 執行測試
+
+```bash
+# 快速測試（約 20 秒）
+./run_tests.sh --fast
+
+# 完整測試（約 60 秒）
+./run_tests.sh
+
+# 只執行特定測試
+./run_tests.sh --test pipeline
+./run_tests.sh --test merge
+
+# 查看測試覆蓋率
+cat tests/TEST_COVERAGE.md
+```
+
+詳細測試說明請參考 [tests/README.md](tests/README.md)
+
+### CI/CD
+
+專案使用 GitHub Actions 進行自動化測試：
+- 每次 push 到 main/develop 分支時自動執行
+- 測試時間約 16 秒
+- 查看測試結果：https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon/actions
+
+## 📁 專案結構
 
 ```
 asr/
-├── asr.sh                          # 便捷執行腳本
-├── asr_multi_speaker_v5_fast.py   # 主程式（GPU 加速版）
-├── pyproject.toml                 # Python 專案設定
-├── .env.example                   # 環境變數範例
-├── .gitignore                     # Git 忽略檔案
-├── README.md                      # 本檔案
-├── COMPARISON.md                  # 與 WhisperX 的比較
-├── LICENSE                        # MIT 授權
-├── examples/                      # 範例檔案
-│   ├── sample-01.mp4             # 範例影片
-│   └── sample-output/            # 範例輸出結果
-│       ├── sample-01_transcription.srt
-│       └── *.png                 # 截圖
-├── legacy/                        # 舊版本（參考用）
-│   ├── asr_multi_speaker_v4.py   # CPU 版本
-│   └── asr_simple.py             # 簡化版本
-└── scripts/                       # 維護腳本
-    └── cleanup_for_git.sh        # Git 清理腳本
+├── gui/                           # GUI 應用程式
+│   ├── main.py                   # GUI 主程式
+│   ├── ui/                       # UI 元件
+│   │   └── main_window.py       # 主視窗
+│   └── core/                     # 核心邏輯
+│       ├── asr_worker.py        # ASR 處理執行緒
+│       └── summary_worker.py    # 摘要生成執行緒
+├── tests/                        # 自動化測試
+│   ├── test_pipeline_e2e.py    # Pipeline 端到端測試
+│   ├── test_merge_srt.py       # 合併邏輯測試
+│   ├── test_gui_media_url.py   # GUI 媒體播放器測試
+│   ├── test_srt_parser.py      # SRT 解析測試
+│   ├── test_error_handling.py  # 錯誤處理測試
+│   └── TEST_COVERAGE.md        # 測試覆蓋率文件
+├── examples/                     # 範例檔案
+│   ├── sample-01.mp4            # 範例影片
+│   └── sample-output/           # 範例輸出結果
+├── scripts/                      # 維護腳本
+│   └── cleanup_for_git.sh       # Git 清理腳本
+├── legacy/                       # 舊版本（參考用）
+│   ├── asr_multi_speaker_v4.py  # CPU 版本
+│   └── asr_simple.py            # 簡化版本
+├── asr_multi_speaker_v5_fast.py # 主程式（命令列版本）
+├── merge_srt.py                 # SRT 合併模組
+├── run_gui.sh                   # GUI 啟動腳本
+├── asr.sh                       # 命令列便捷腳本
+├── run_tests.sh                 # 測試執行腳本
+├── ci_test.sh                   # CI/CD 測試腳本
+├── sync_to_gitlab.sh            # GitLab 同步腳本
+├── sync_all.sh                  # 全部同步腳本
+├── pyproject.toml               # Python 專案設定
+├── .env.example                 # 環境變數範例
+├── .gitignore                   # Git 忽略檔案
+├── README.md                    # 本檔案
+├── COMPARISON.md                # 與 WhisperX 的比較
+└── LICENSE                      # MIT 授權
 ```
 
-## 授權
+## 🤝 貢獻
 
-MIT License
+歡迎提交 Issue 和 Pull Request！
 
-## 與 WhisperX 的比較
+### 開發流程
+
+1. Fork 專案
+2. 建立功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交變更 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 開啟 Pull Request
+
+### 測試要求
+
+提交 PR 前請確保：
+- 所有測試通過 (`./run_tests.sh`)
+- 新功能有對應的測試
+- 程式碼符合專案風格
+
+## 📊 與 WhisperX 的比較
 
 本專案與 [WhisperX](https://github.com/m-bain/whisperX) 都使用 pyannote.audio 進行說話人分離，但有以下關鍵差異：
 
 | 特性 | 本專案 | WhisperX |
 |------|--------|----------|
 | **硬體優化** | Apple Silicon (MPS) | NVIDIA GPU (CUDA) |
+| **使用介面** | GUI + 命令列 | 命令列 |
 | **時間戳精度** | ±0.1-0.5 秒 | ±0.01-0.05 秒（強制對齊） |
 | **跨平台** | 僅 macOS (M1/M2/M3) | Linux, Windows, macOS |
 | **處理速度** | 快（M1 原生） | 非常快（CUDA） |
-| **功能** | ASR + 說話人分離 | ASR + 說話人分離 + 翻譯 + 批次 |
+| **功能** | ASR + 說話人分離 + 字幕編輯 | ASR + 說話人分離 + 翻譯 + 批次 |
 | **安裝** | 簡單 | 中等 |
 
 **選擇本專案，如果你：**
 - ✅ 使用 Apple Silicon Mac
-- ✅ 想要最簡單的安裝和使用
+- ✅ 想要友善的圖形界面
+- ✅ 需要字幕編輯功能
 - ✅ 在 Mac 上需要最快的處理速度
 
 **選擇 WhisperX，如果你：**
@@ -453,32 +492,48 @@ MIT License
 
 詳細比較請參考 [COMPARISON.md](COMPARISON.md)
 
-## 致謝
+## 📄 授權
+
+MIT License - 詳見 [LICENSE](LICENSE) 檔案
+
+## 🙏 致謝
 
 - [MLX Whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) - Apple Silicon 優化的 Whisper 實作
 - [pyannote.audio](https://github.com/pyannote/pyannote-audio) - 說話者分離模型
 - [OpenAI Whisper](https://github.com/openai/whisper) - 原始 Whisper 模型
+- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) - GUI 框架
 
-## 貢獻
+## 📝 更新日誌
 
-歡迎提交 Issue 和 Pull Request！
+### v5.1 (2026-02-23)
+- ✨ 新增 PyQt6 圖形界面
+- ✨ 支援字幕編輯和音訊播放
+- ✨ 新增段落合併功能（相同說話者）
+- ✨ 完整的自動化測試套件（54% 覆蓋率）
+- ✨ GitHub Actions CI/CD 整合
+- 🐛 修正中文檔名音訊播放問題
+- 🐛 修正 language=auto 崩潰問題
 
-## 更新日誌
-
-### v5 (2025-02-05)
+### v5.0 (2025-02-05)
 - ✨ 新增 MPS GPU 加速支援
 - ⚡ 增加 CPU 執行緒數到 8
 - 🚀 效能提升 6 倍
 
-### v4 (2025-02-04)
+### v4.0 (2025-02-04)
 - ✨ 支援 pyannote.audio 4.x API
 - 🐛 修正 PyTorch 2.6+ weights_only 問題
 - 🔧 針對 M1 Mac 優化
 
-### v3 (2025-02-04)
+### v3.0 (2025-02-04)
 - ✨ 使用 subprocess 隔離說話者分離
 - 🐛 修正 segmentation fault 問題
 
-### v2 (2025-02-04)
+### v2.0 (2025-02-04)
 - ✨ 初始版本
 - 🎯 支援多說話者分離
+
+---
+
+**專案維護者：** [@KenexAtWork](https://github.com/KenexAtWork)
+
+**問題回報：** https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon/issues
