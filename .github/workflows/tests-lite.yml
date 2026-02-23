@@ -29,12 +29,10 @@ jobs:
     
     - name: Run logic tests (no MLX required)
       run: |
-        # 設定 PYTHONPATH 讓測試能找到模組
-        export PYTHONPATH="${PYTHONPATH}:$(pwd)/asr"
-        cd asr
-        # 只執行不需要 MLX 的測試
-        python tests/test_merge_srt.py
-        python tests/test_srt_parser.py
+        # 不要 cd 到 asr，直接從 repo 根目錄執行
+        # 這樣測試腳本的相對路徑計算才正確
+        python asr/tests/test_merge_srt.py
+        python asr/tests/test_srt_parser.py
     
     - name: Test summary
       if: always()
