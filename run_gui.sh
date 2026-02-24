@@ -92,4 +92,35 @@ fi
 echo ""
 echo "🚀 啟動 ASR GUI..."
 echo "💡 提示：按 Ctrl+C 可以停止 GUI"
+echo ""
+
+# 檢查是否為首次執行（模型尚未下載）
+MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
+WHISPER_CACHE_DIR="$HOME/.cache/mlx_whisper"
+
+FIRST_RUN=false
+if [ ! -d "$MODEL_CACHE_DIR" ] && [ ! -d "$WHISPER_CACHE_DIR" ]; then
+    FIRST_RUN=true
+fi
+
+if [ "$FIRST_RUN" = true ]; then
+    echo "⚠️  首次執行偵測"
+    echo ""
+    echo "系統將自動下載以下 AI 模型（僅首次需要）："
+    echo "  • Whisper 語音辨識模型：約 1.5 GB"
+    echo "  • Speaker Diarization 模型：約 200 MB"
+    echo ""
+    echo "預估下載時間："
+    echo "  • 快速網路（100 Mbps）：約 2-3 分鐘"
+    echo "  • 一般網路（50 Mbps）：約 5-8 分鐘"
+    echo ""
+    echo "💡 提示："
+    echo "  - 下載期間 GUI 可能看起來無回應，這是正常的"
+    echo "  - 模型會自動快取，之後啟動很快"
+    echo "  - 請保持網路連線穩定"
+    echo ""
+    read -p "按 Enter 繼續..." -r
+    echo ""
+fi
+
 python gui/main.py

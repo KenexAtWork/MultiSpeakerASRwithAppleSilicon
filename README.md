@@ -18,23 +18,47 @@
 
 ## 🚀 快速開始
 
-### 1. 安裝
+### 方法一：自動安裝（推薦）
 
 ```bash
-# 安裝系統依賴（如果還沒安裝）
-brew install ffmpeg uv
-
-# Clone 專案
+# 1. Clone 專案
 git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
 cd MultiSpeakerASRwithAppleSilicon
 
-# 建立虛擬環境並安裝套件
-uv venv --python 3.10
-source .venv/bin/activate
-uv pip install -e .
+# 2. 執行安裝腳本
+./install.sh
+
+# 3. 編輯 .env 檔案，填入 Hugging Face Token
+nano .env  # 或使用其他編輯器
+
+# 4. 啟動 GUI
+./run_gui.sh
 ```
 
-### 2. 設定 Hugging Face Token
+### 方法二：手動安裝
+
+```bash
+# 1. 安裝系統依賴（如果還沒安裝）
+brew install ffmpeg
+
+# 2. 安裝 uv（Python 套件管理器，比 pip 快 10-100 倍）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 3. Clone 專案
+git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git
+cd MultiSpeakerASRwithAppleSilicon
+
+# 4. 建立虛擬環境並安裝套件
+uv venv --python 3.10
+source .venv/bin/activate
+uv pip install -e ".[all]"  # 安裝所有功能（GUI + AWS）
+
+# 5. 設定環境變數
+cp .env.example .env
+nano .env  # 填入 HF_TOKEN
+```
+
+### 設定 Hugging Face Token
 
 說話者分離功能需要 Hugging Face token：
 
@@ -42,22 +66,19 @@ uv pip install -e .
 2. 接受模型使用條款：
    - https://huggingface.co/pyannote/speaker-diarization-3.1
    - https://huggingface.co/pyannote/segmentation-3.0
-3. 複製 `.env.example` 為 `.env` 並填入 token：
-
-```bash
-cp .env.example .env
-# 編輯 .env，填入: HF_TOKEN=your_huggingface_token_here
-```
+3. 將 token 填入 `.env` 檔案：`HF_TOKEN=your_token_here`
 
 **詳細申請教學：** [如何申請 Hugging Face Token](https://ithelp.ithome.com.tw/articles/10389679)
 
-### 3. 啟動 GUI
+### 首次執行注意事項
 
-```bash
-./run_gui.sh
-```
+⚠️ **首次執行會自動下載 AI 模型（約 1.7 GB）**
 
-第一次執行會自動下載模型（約 1.7 GB），需要 5-15 分鐘。
+- Whisper 語音辨識模型：約 1.5 GB
+- Speaker Diarization 模型：約 200 MB
+- 下載時間：2-8 分鐘（視網路速度）
+- 下載期間 GUI 可能看起來無回應，這是正常的
+- 模型會自動快取，之後啟動很快（< 5 秒）
 
 ## 🎯 使用 GUI
 
