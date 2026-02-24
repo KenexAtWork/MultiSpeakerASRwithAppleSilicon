@@ -36,6 +36,9 @@ class ASRWorker(QThread):
     def run(self):
         """執行 ASR 處理（透過 subprocess）"""
         try:
+            # 檢查模型是否已下載
+            self._check_and_notify_model_download()
+            
             self.log_message.emit("=" * 60)
             self.log_message.emit("開始處理...")
             self.log_message.emit(f"輸入檔案: {self.video_file}")
@@ -160,3 +163,71 @@ class ASRWorker(QThread):
             self.progress.emit(90)
         elif '處理完成' in line:
             self.progress.emit(95)
+
+    def _check_and_notify_model_download(self):
+        """檢查模型是否需要下載，並在 GUI 中顯示提示"""
+        from pathlib import Path
+        
+        # 檢查 Hugging Face 快取目錄
+        hf_cache = Path.home() / '.cache' / 'huggingface' / 'hub'
+        mlx_cache = Path.home() / '.cache' / 'mlx_whisper'
+        
+        # 檢查 Whisper 模型
+        model_map = {
+            "tiny": "whisper-tiny-mlx",
+            "base": "whisper-base-mlx",
+            "small": "whisper-small-mlx",
+            "medium": "whisper-medium-mlx",
+            "large": "whisper-large-v3-mlx"
+        }
+        whisper_model_name = model_map.get(self.model_size, "whisper-medium-mlx")
+        whisper_exists = False
+        
+        if hf_cache.exists():
+            for item in hf_cache.iterdir():
+                if whisper_model_name in item.name:
+                    whisper_exists = True
+                    break
+        
+        if not whisper_exists and mlx_cache.exists():
+            whisper_exists = mlx_cache.exists()
+        
+        # 檢查 Diarization 模型
+        diarization_exists = False
+        if not self.skip_diarization and hf_cache.exists():
+            for item in hf_cache.iterdir():
+                if 'speaker-diarization' in item.name:
+                    diarization_exists = True
+                    break
+        
+        # 顯示下載提示
+        if not whisper_exists or (not self.skip_diarization and not diarization_exists):
+            self.log_message.emit("=" * 60)
+            self.log_message.emit("⚠️  首次使用偵測")
+            self.log_message.emit("=" * 60)
+            
+            if not whisper_exists:
+                model_sizes = {
+                    "tiny": "約 100 MB",
+                    "base": "約 150 MB",
+                    "small": "約 500 MB",
+                    "medium": "約 1.5 GB",
+                    "large": "約 3 GB"
+                }
+                size = model_sizes.get(self.model_size, "約 1.5 GB")
+                self.log_message.emit(f"📥 首次使用 Whisper {self.model_size} 模型")
+                self.log_message.emit(f"   需要下載模型檔案：{size}")
+                self.log_message.emit(f"   下載時間視網路速度而定（約 1-5 分鐘）")
+            
+            if not self.skip_diarization and not diarization_exists:
+                self.log_message.emit(f"📥 首次使用說話者分離功能")
+                self.log_message.emit(f"   需要下載模型檔案：約 200 MB")
+                self.log_message.emit(f"   下載時間視網路速度而定（約 1-2 分鐘）")
+            
+            self.log_message.emit("")
+            self.log_message.emit("💡 提示：")
+            self.log_message.emit("   - 模型下載完成後會自動快取")
+            self.log_message.emit("   - 之後使用將會很快（< 5 秒啟動）")
+            self.log_message.emit("   - 下載期間請保持網路連線")
+            self.log_message.emit("=" * 60)
+            self.log_message.emit("")
