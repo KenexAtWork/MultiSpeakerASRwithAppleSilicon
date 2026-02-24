@@ -152,7 +152,7 @@ nano .env  # 填入 HF_TOKEN
 # 然後拖放 examples/sample-01.mp4 到 GUI
 
 # 或使用命令列測試
-./asr.sh examples/sample-01.mp4
+./scripts/asr.sh examples/sample-01.mp4
 
 # 查看範例輸出
 cat examples/sample-output/sample-01_transcription.srt
@@ -262,20 +262,20 @@ MLX Whisper 支援多種模型大小，可根據記憶體和準確度需求選�
 
 ```bash
 # 基本使用（自動產生輸出檔名）
-./asr.sh video.mp4
+./scripts/asr.sh video.mp4
 
 # 指定輸出檔名和格式
-./asr.sh video.mp4 output.srt
-./asr.sh video.mp4 output.txt --format txt
+./scripts/asr.sh video.mp4 output.srt
+./scripts/asr.sh video.mp4 output.txt --format txt
 
 # 指定語言和模型
-./asr.sh video.mp4 output.srt --language zh --model small
+./scripts/asr.sh video.mp4 output.srt --language zh --model small
 
 # 跳過說話者分離（更快）
-./asr.sh video.mp4 output.srt --skip-diarization
+./scripts/asr.sh video.mp4 output.srt --skip-diarization
 
 # 使用 CPU（不使用 GPU）
-./asr.sh video.mp4 output.srt --no-gpu
+./scripts/asr.sh video.mp4 output.srt --no-gpu
 ```
 
 ### 直接執行 Python 腳本
@@ -296,7 +296,7 @@ python asr_multi_speaker_v5_fast.py \
 ```bash
 # 處理資料夾中的所有影片
 for video in videos/*.mp4; do
-  ./asr.sh "$video"
+  ./scripts/asr.sh "$video"
 done
 ```
 
@@ -444,30 +444,36 @@ asr/
 ├── tests/                        # 自動化測試
 │   ├── test_pipeline_e2e.py    # Pipeline 端到端測試
 │   ├── test_merge_srt.py       # 合併邏輯測試
+│   ├── test_gui_display.py     # GUI 顯示測試
+│   ├── test_gui_processing.py  # GUI 處理測試
 │   ├── test_gui_media_url.py   # GUI 媒體播放器測試
 │   ├── test_srt_parser.py      # SRT 解析測試
 │   ├── test_error_handling.py  # 錯誤處理測試
 │   └── TEST_COVERAGE.md        # 測試覆蓋率文件
+├── scripts/                      # 腳本工具
+│   ├── asr.sh                   # 命令列便捷腳本
+│   ├── asr_chunked.sh           # 分段處理腳本
+│   ├── benchmark.sh             # 效能測試腳本
+│   ├── ci_test.sh               # CI/CD 測試腳本
+│   └── cleanup_for_git.sh       # Git 清理腳本
 ├── examples/                     # 範例檔案
 │   ├── sample-01.mp4            # 範例影片
 │   └── sample-output/           # 範例輸出結果
-├── scripts/                      # 維護腳本
-│   └── cleanup_for_git.sh       # Git 清理腳本
-├── legacy/                       # 舊版本（參考用）
-│   ├── asr_multi_speaker_v4.py  # CPU 版本
-│   └── asr_simple.py            # 簡化版本
+├── screenshots/                  # GUI 截圖
+│   ├── 01-main-interface.png
+│   ├── 02-transcription-result.png
+│   └── 03-aws-summary.png
+├── benchmark_results/            # 效能測試結果
 ├── asr_multi_speaker_v5_fast.py # 主程式（命令列版本）
 ├── merge_srt.py                 # SRT 合併模組
+├── install.sh                   # 自動安裝腳本
 ├── run_gui.sh                   # GUI 啟動腳本
-├── asr.sh                       # 命令列便捷腳本
 ├── run_tests.sh                 # 測試執行腳本
-├── ci_test.sh                   # CI/CD 測試腳本
-├── sync_to_gitlab.sh            # GitLab 同步腳本
-├── sync_all.sh                  # 全部同步腳本
 ├── pyproject.toml               # Python 專案設定
 ├── .env.example                 # 環境變數範例
 ├── .gitignore                   # Git 忽略檔案
-├── README.md                    # 本檔案
+└── README.md                    # 本檔案
+```
 ├── COMPARISON.md                # 與 WhisperX 的比較
 └── LICENSE                      # MIT 授權
 ```
