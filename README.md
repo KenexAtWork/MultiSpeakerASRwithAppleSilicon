@@ -131,6 +131,43 @@ nano .env  # 填入 HF_TOKEN
 - **字幕編輯** - 雙擊字幕可編輯內容，支援多行文字
 - **音訊播放** - 同步播放音訊，點擊字幕跳轉到對應時間
 - **開啟資料夾** - 快速開啟輸出檔案所在資料夾
+- **AI 摘要** - 使用 AWS Bedrock Claude 生成會議摘要
+  - 自動讀取 AWS 設定（使用 `default` profile）
+  - 支援多個 AWS 區域選擇
+  - 可自訂 Prompt 模板
+  - 一鍵產生結構化摘要
+
+### AWS 摘要功能設定
+
+使用 AWS Bedrock 摘要功能需要：
+
+1. **AWS 帳號** - 需要有 AWS 帳號並啟用 Bedrock 服務
+2. **AWS CLI 設定** - 配置 AWS credentials：
+
+```bash
+# 安裝 AWS CLI（如果還沒安裝）
+brew install awscli
+
+# 設定 AWS credentials（使用 default profile）
+aws configure
+# 輸入：
+#   AWS Access Key ID
+#   AWS Secret Access Key
+#   Default region name (例如: us-west-2)
+#   Default output format (json)
+```
+
+3. **Bedrock 權限** - 確保 IAM 使用者有 Bedrock 存取權限：
+   - `bedrock:InvokeModel`
+   - 建議使用的模型：`anthropic.claude-3-sonnet-20240229-v1:0`
+
+4. **區域選擇** - 在 GUI 中選擇有 Bedrock 服務的區域：
+   - `us-east-1` (維吉尼亞北部)
+   - `us-west-2` (奧勒岡)
+   - `ap-northeast-1` (東京)
+   - 其他支援 Bedrock 的區域
+
+**注意：** 程式會自動讀取 `~/.aws/credentials` 和 `~/.aws/config` 中的 `default` profile 設定。
 
 詳細使用說明請參考 [GUI 使用說明](gui/README.md)。
 
