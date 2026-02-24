@@ -5,8 +5,8 @@ description = "ASR with speaker diarization for Apple Silicon Mac"
 requires-python = ">=3.10"
 dependencies = [
     "mlx-whisper>=0.3.0",
-    "torch>=2.5.0",
-    "torchaudio>=2.5.0",
+    "torch>=2.5.0,<2.6.0",
+    "torchaudio>=2.5.0,<2.6.0",
     "pyannote-audio>=3.1.0",
     "numpy<2.0.0",
     "librosa>=0.10.0",
