@@ -17,6 +17,9 @@ from ui.main_window import MainWindow
 
 def main():
     """主程式入口"""
+    print("⏳ 正在啟動 GUI...")
+    print("💡 首次啟動需要載入 PyQt6 和初始化界面，請稍候...")
+    
     # 啟用高 DPI 支援
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -29,8 +32,12 @@ def main():
     # 設定應用程式樣式
     app.setStyle("Fusion")
     
+    print("✓ GUI 初始化完成")
+    
     window = MainWindow()
     window.show()
+    
+    print("✓ GUI 視窗已開啟")
     
     sys.exit(app.exec())
 

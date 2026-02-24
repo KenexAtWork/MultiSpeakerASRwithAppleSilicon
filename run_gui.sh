@@ -129,4 +129,8 @@ if [ "$FIRST_RUN" = true ]; then
     echo ""
 fi
 
+echo "⏳ 啟動中..."
+echo "💡 首次啟動需要載入 PyQt6（約 3-5 秒），請稍候..."
+echo ""
+
 python gui/main.py
