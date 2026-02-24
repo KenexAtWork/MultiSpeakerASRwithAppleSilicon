@@ -2,9 +2,30 @@
 
 🎙️ 使用 MLX Whisper 和 pyannote.audio 進行語音轉錄和說話者分離的工具，針對 Apple Silicon Mac 優化。
 
-提供友善的圖形界面，支援拖放檔案、即時進度顯示、字幕編輯等功能。
+提供友善的圖形界面，支援拖放檔案、即時進度顯示、字幕編輯、AWS Bedrock 摘要等功能。
 
-![GUI Screenshot](examples/sample-output/gui-screenshot.png)
+## 📸 功能展示
+
+### 主界面 - 檔案選擇與參數設定
+![主界面](screenshots/01-main-interface.png)
+- 拖放檔案或點擊選擇
+- 選擇 Whisper 模型大小
+- 設定語言和輸出格式
+- 啟用/停用說話者分離
+
+### 轉錄結果 - 即時處理日誌與字幕編輯
+![轉錄結果](screenshots/02-transcription-result.png)
+- 即時顯示處理進度和日誌
+- 自動識別說話者（SPEAKER_00, SPEAKER_01...）
+- 內建字幕編輯器，雙擊可編輯
+- 音訊播放器，點擊字幕跳轉
+
+### AWS Bedrock 摘要功能
+![AWS 摘要](screenshots/03-aws-summary.png)
+- 使用 AWS Bedrock Claude 生成會議摘要
+- 支援多個 AWS 區域
+- 可自訂 Prompt
+- 一鍵產生結構化摘要
 
 ## ✨ 主要特色
 
@@ -15,6 +36,7 @@
 - 📝 **字幕編輯** - 內建字幕編輯器，可即時修改並儲存
 - 🎵 **音訊播放** - 同步播放音訊，點擊字幕跳轉
 - 💾 **多種格式** - 輸出 SRT 或 TXT 格式
+- 🤖 **AI 摘要** - 整合 AWS Bedrock，自動生成會議摘要
 
 ## 🚀 快速開始
 
