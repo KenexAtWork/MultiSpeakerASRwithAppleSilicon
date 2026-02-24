@@ -4,6 +4,9 @@
 
 set -e
 
+# 設定信號處理，確保 Ctrl+C 可以正常中斷
+trap 'echo ""; echo "⏹️  GUI 已停止"; exit 0' INT TERM
+
 # 取得腳本所在目錄
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -88,4 +91,5 @@ fi
 # 啟動 GUI
 echo ""
 echo "🚀 啟動 ASR GUI..."
+echo "💡 提示：按 Ctrl+C 可以停止 GUI"
 python gui/main.py
