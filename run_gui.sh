@@ -76,14 +76,20 @@ fi
 # 檢查 HF_TOKEN
 if [ -z "$HF_TOKEN" ]; then
     echo ""
-    echo "⚠️  警告：未設定 HF_TOKEN"
-    echo "說話者分離功能需要 Hugging Face token"
-    echo "請在 .env 檔案中設定或執行："
-    echo "  export HF_TOKEN=your_token_here"
+    echo "⚠️  提示：未設定 HF_TOKEN"
     echo ""
-    read -p "是否繼續啟動 GUI？[y/N] " -n 1 -r
+    echo "影響："
+    echo "  ✓ 可以使用：語音轉錄功能"
+    echo "  ✗ 無法使用：說話者分離功能"
+    echo ""
+    echo "如需使用說話者分離，請："
+    echo "  1. 前往 https://huggingface.co/settings/tokens 取得 token"
+    echo "  2. 在 .env 檔案中設定 HF_TOKEN=your_token_here"
+    echo "  3. 或執行：export HF_TOKEN=your_token_here"
+    echo ""
+    read -p "是否繼續啟動 GUI？[Y/n] " -n 1 -r
     echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
         exit 1
     fi
 fi
