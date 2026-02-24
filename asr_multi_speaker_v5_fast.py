@@ -199,19 +199,10 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 # 設定執行緒數（使用所有效能核心）
                 torch.set_num_threads(8)
                 
-                # 相容新舊版本的 pyannote.audio API
-                # 新版本使用 token，舊版本使用 use_auth_token
-                try:
-                    pipeline = Pipeline.from_pretrained(
-                        "pyannote/speaker-diarization-3.1",
-                        use_auth_token=hf_token
-                    )
-                except TypeError:
-                    # 如果 use_auth_token 不支援，嘗試使用 token
-                    pipeline = Pipeline.from_pretrained(
-                        "pyannote/speaker-diarization-3.1",
-                        token=hf_token
-                    )
+                pipeline = Pipeline.from_pretrained(
+                    "pyannote/speaker-diarization-3.1",
+                    use_auth_token=hf_token
+                )
                 tprint("✓ 模型載入完成")
                 
                 # 嘗試使用 MPS (Metal Performance Shaders) GPU
