@@ -463,7 +463,6 @@ asr/
 │   ├── 01-main-interface.png
 │   ├── 02-transcription-result.png
 │   └── 03-aws-summary.png
-├── benchmark_results/            # 效能測試結果
 ├── asr_multi_speaker_v5_fast.py # 主程式（命令列版本）
 ├── merge_srt.py                 # SRT 合併模組
 ├── install.sh                   # 自動安裝腳本
@@ -472,8 +471,7 @@ asr/
 ├── pyproject.toml               # Python 專案設定
 ├── .env.example                 # 環境變數範例
 ├── .gitignore                   # Git 忽略檔案
-└── README.md                    # 本檔案
-```
+├── README.md                    # 本檔案
 ├── COMPARISON.md                # 與 WhisperX 的比較
 └── LICENSE                      # MIT 授權
 ```
