@@ -6,8 +6,8 @@ requires-python = ">=3.10"
 dependencies = [
     "mlx-whisper>=0.3.0",
     "pyannote-audio>=3.1.0",
-    "torch>=2.1.0",
-    "torchaudio>=2.1.0",
+    "torch>=2.3.0",
+    "torchaudio>=2.3.0",
     "numpy<2.0.0",
     "librosa>=0.10.0",
 ]
