@@ -16,23 +16,38 @@ cd "$SCRIPT_DIR"
 
 # 1. 檢查 Python 版本
 echo "📋 [1/5] 檢查 Python 版本..."
-if ! command -v python3 &>/dev/null; then
-    echo "❌ 錯誤：未找到 python3"
-    echo "請先安裝 Python 3.10 或更新版本"
+
+# 嘗試找到合適的 Python 版本
+PYTHON_CMD=""
+for cmd in python3.13 python3.12 python3.11 python3.10 python3; do
+    if command -v $cmd &>/dev/null; then
+        VERSION=$($cmd --version 2>&1 | awk '{print $2}')
+        MAJOR=$(echo $VERSION | cut -d. -f1)
+        MINOR=$(echo $VERSION | cut -d. -f2)
+        
+        if [ "$MAJOR" -eq 3 ] && [ "$MINOR" -ge 10 ]; then
+            PYTHON_CMD=$cmd
+            PYTHON_VERSION=$VERSION
+            break
+        fi
+    fi
+done
+
+if [ -z "$PYTHON_CMD" ]; then
+    echo "❌ 錯誤：未找到 Python 3.10 或更新版本"
+    echo ""
+    echo "請安裝 Python 3.10+："
+    echo "  方法 1 - 使用 Homebrew（推薦）："
+    echo "    brew install python@3.10"
+    echo ""
+    echo "  方法 2 - 從官網下載："
+    echo "    https://www.python.org/downloads/"
+    echo ""
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 --version | awk '{print $2}')
-PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
-PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
-
-if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]); then
-    echo "❌ 錯誤：需要 Python 3.10 或更新版本"
-    echo "當前版本：$PYTHON_VERSION"
-    exit 1
-fi
-
-echo "✓ Python 版本：$PYTHON_VERSION"
+echo "✓ 找到 Python：$PYTHON_CMD"
+echo "✓ 版本：$PYTHON_VERSION"
 echo ""
 
 # 2. 檢查/安裝 uv
@@ -63,14 +78,14 @@ if [ -d ".venv" ]; then
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         rm -rf .venv
-        uv venv --python 3.10
+        uv venv --python $PYTHON_CMD
         echo "✓ 虛擬環境已重新建立"
     else
         echo "✓ 使用現有虛擬環境"
     fi
 else
-    uv venv --python 3.10
-    echo "✓ 虛擬環境已建立"
+    uv venv --python $PYTHON_CMD
+    echo "✓ 虛擬環境已建立（使用 $PYTHON_CMD）"
 fi
 
 # 啟動虛擬環境
