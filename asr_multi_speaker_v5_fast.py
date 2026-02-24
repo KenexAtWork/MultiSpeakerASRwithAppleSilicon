@@ -201,7 +201,7 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
                 
                 pipeline = Pipeline.from_pretrained(
                     "pyannote/speaker-diarization-3.1",
-                    use_auth_token=hf_token
+                    token=hf_token
                 )
                 tprint("✓ 模型載入完成")
                 
