@@ -4,38 +4,26 @@
 
 ## 打包方式
 
-### 方法 1：使用打包腳本（推薦）
+使用 git archive 打包（最乾淨的方式）：
 
 ```bash
-./scripts/package_for_distribution.sh
-```
-
-這會在上層目錄產生 `MultiSpeakerASR-YYYYMMDD.tar.gz` 檔案。
-
-### 方法 2：手動打包
-
-```bash
-# 使用 git archive（最乾淨）
 git archive --format=tar.gz --prefix=MultiSpeakerASR/ -o MultiSpeakerASR.tar.gz HEAD
-
-# 或手動排除不需要的檔案
-tar -czf MultiSpeakerASR.tar.gz \
-  --exclude='.git' \
-  --exclude='.venv' \
-  --exclude='__pycache__' \
-  --exclude='*.pyc' \
-  --exclude='.DS_Store' \
-  --exclude='.env' \
-  MultiSpeakerASRwithAppleSilicon/
 ```
+
+這會產生 `MultiSpeakerASR.tar.gz` 檔案，包含所有 Git 追蹤的檔案，但不包含：
+- `.git/` 目錄
+- `.venv/` 虛擬環境
+- `__pycache__/` 快取
+- `.env` 環境變數
+- 其他 `.gitignore` 中的檔案
 
 ## 接收者使用步驟
 
 ### 1. 解壓縮
 
 ```bash
-tar -xzf MultiSpeakerASR-YYYYMMDD.tar.gz
-cd MultiSpeakerASR-YYYYMMDD
+tar -xzf MultiSpeakerASR.tar.gz
+cd MultiSpeakerASR
 ```
 
 ### 2. 執行安裝
