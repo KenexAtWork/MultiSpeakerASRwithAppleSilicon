@@ -1,258 +1,258 @@
-# 方案比較：本專案 vs WhisperX
+# Solution Comparison: This Project vs WhisperX
 
-## 架構對比
+## Architecture Comparison
 
-### 本專案（MLX Whisper + pyannote.audio）
+### This Project (MLX Whisper + pyannote.audio)
 
 ```
-影片檔案
+Video File
    │
    ▼
-[MLX Whisper] (Apple Silicon 原生)
-   ├── 語音識別 → 文字轉錄
-   ├── 字級時間戳
+[MLX Whisper] (Apple Silicon Native)
+   ├── Speech Recognition → Text Transcription
+   ├── Word-level Timestamps
    ▼
 [ffmpeg]
-   └── 提取音訊 → 16kHz 單聲道 WAV
+   └── Extract Audio → 16kHz Mono WAV
    ▼
 [pyannote.audio 4.x]
-   ├── Speaker Embedding → 提取說話人特徵
-   ├── Clustering → 區分發言人
+   ├── Speaker Embedding → Extract Speaker Features
+   ├── Clustering → Distinguish Speakers
    ▼
-[合併結果]
-   └── 輸出帶 Speaker 標籤的文字檔
+[Merge Results]
+   └── Output Text with Speaker Labels
 ```
 
-### WhisperX 方案
+### WhisperX Solution
 
 ```
-音訊檔案
+Audio File
    │
    ▼
-[WhisperX] (CTranslate2 引擎)
-   ├── 語音識別 → 文字轉錄
-   ├── 字級強制對齊 (Forced Alignment)
+[WhisperX] (CTranslate2 Engine)
+   ├── Speech Recognition → Text Transcription
+   ├── Word-level Forced Alignment
    ▼
 [pyannote.audio]
-   ├── Speaker Embedding → 提取說話人特徵
-   ├── Clustering → 區分發言人
+   ├── Speaker Embedding → Extract Speaker Features
+   ├── Clustering → Distinguish Speakers
    ▼
 [WhisperX Integration]
-   └── 輸出帶 Speaker 標籤的 JSON
+   └── Output JSON with Speaker Labels
 ```
 
-## 詳細比較
+## Detailed Comparison
 
-| 特性 | 本專案 | WhisperX |
-|------|--------|----------|
-| **ASR 引擎** | MLX Whisper | CTranslate2 Whisper |
-| **硬體優化** | Apple Silicon (MPS) | CUDA GPU / CPU |
-| **時間戳精度** | 字級 (word-level) | 字級強制對齊 (更精確) |
-| **說話人分離** | pyannote.audio 4.x | pyannote.audio 3.x |
-| **GPU 加速** | MPS (Metal) | CUDA (NVIDIA) |
-| **處理速度** | 快 (M1 原生) | 非常快 (CTranslate2) |
-| **記憶體使用** | 中等 | 低 (int8 量化) |
-| **安裝複雜度** | 簡單 (uv + pip) | 中等 (需要額外依賴) |
-| **跨平台** | 僅 macOS (Apple Silicon) | Linux, Windows, macOS |
-| **輸出格式** | 純文字 | JSON, SRT, VTT, TXT |
-| **翻譯功能** | ❌ | ✅ (內建) |
-| **批次處理** | ❌ | ✅ |
+| Feature | This Project | WhisperX |
+|---------|-------------|----------|
+| **ASR Engine** | MLX Whisper | CTranslate2 Whisper |
+| **Hardware Optimization** | Apple Silicon (MPS) | CUDA GPU / CPU |
+| **Timestamp Precision** | Word-level | Word-level forced alignment (more precise) |
+| **Speaker Diarization** | pyannote.audio 4.x | pyannote.audio 3.x |
+| **GPU Acceleration** | MPS (Metal) | CUDA (NVIDIA) |
+| **Processing Speed** | Fast (M1 native) | Very fast (CTranslate2) |
+| **Memory Usage** | Medium | Low (int8 quantization) |
+| **Installation Complexity** | Simple (uv + pip) | Medium (requires additional dependencies) |
+| **Cross-Platform** | macOS only (Apple Silicon) | Linux, Windows, macOS |
+| **Output Format** | Plain text | JSON, SRT, VTT, TXT |
+| **Translation Feature** | ❌ | ✅ (built-in) |
+| **Batch Processing** | ❌ | ✅ |
 
-## 核心差異
+## Core Differences
 
-### 1. ASR 引擎
+### 1. ASR Engine
 
-**本專案 - MLX Whisper:**
-- ✅ Apple Silicon 原生優化
-- ✅ 使用 Metal Performance Shaders
-- ✅ 記憶體效率高
-- ❌ 僅支援 macOS (M1/M2/M3)
-- ❌ 無法在 Intel Mac 或其他平台運行
+**This Project - MLX Whisper:**
+- ✅ Apple Silicon native optimization
+- ✅ Uses Metal Performance Shaders
+- ✅ High memory efficiency
+- ❌ macOS only (M1/M2/M3)
+- ❌ Cannot run on Intel Mac or other platforms
 
 **WhisperX - CTranslate2:**
-- ✅ 跨平台支援 (Linux, Windows, macOS)
-- ✅ 支援 NVIDIA GPU (CUDA)
-- ✅ 支援 int8 量化（更快、更省記憶體）
-- ✅ 批次處理能力
-- ❌ 在 Apple Silicon 上需要透過 Rosetta 或 CPU 模式
+- ✅ Cross-platform support (Linux, Windows, macOS)
+- ✅ Supports NVIDIA GPU (CUDA)
+- ✅ Supports int8 quantization (faster, less memory)
+- ✅ Batch processing capability
+- ❌ On Apple Silicon requires Rosetta or CPU mode
 
-### 2. 時間戳對齊
+### 2. Timestamp Alignment
 
-**本專案:**
-- 使用 Whisper 原生的字級時間戳
-- 精度：約 ±0.1-0.5 秒
-- 無額外對齊步驟
+**This Project:**
+- Uses Whisper's native word-level timestamps
+- Precision: ~±0.1-0.5 seconds
+- No additional alignment step
 
 **WhisperX:**
-- 使用 Montreal Forced Aligner 技術
-- 精度：毫秒級 (±0.01-0.05 秒)
-- 額外的對齊步驟，但更精確
+- Uses Montreal Forced Aligner technology
+- Precision: millisecond-level (±0.01-0.05 seconds)
+- Additional alignment step, but more precise
 
-### 3. 說話人分離整合
+### 3. Speaker Diarization Integration
 
-**本專案:**
+**This Project:**
 ```python
-# 分離執行
-1. MLX Whisper 轉錄 → 得到文字 + 時間戳
-2. pyannote 分離 → 得到說話人時間段
-3. 手動合併 → 匹配時間戳
+# Separate execution
+1. MLX Whisper transcription → Get text + timestamps
+2. pyannote diarization → Get speaker time segments
+3. Manual merge → Match timestamps
 ```
 
 **WhisperX:**
 ```python
-# 整合執行
-1. WhisperX 轉錄 + 對齊
-2. 內建 pyannote 整合
-3. 自動合併輸出
+# Integrated execution
+1. WhisperX transcription + alignment
+2. Built-in pyannote integration
+3. Automatic merge output
 ```
 
-### 4. 效能比較
+### 4. Performance Comparison
 
-**測試環境：M1 Pro (8 核心 CPU, 14 核心 GPU)**
+**Test Environment: M1 Pro (8-core CPU, 14-core GPU)**
 
-| 影片長度 | 本專案 (MPS) | WhisperX (CPU) | WhisperX (估計 CUDA) |
-|---------|-------------|----------------|---------------------|
-| 90 秒   | ~45 秒      | ~60 秒         | ~30 秒              |
-| 3 分鐘  | ~55 秒      | ~2 分鐘        | ~1 分鐘             |
-| 31 分鐘 | ~10 分鐘    | ~20 分鐘       | ~8 分鐘             |
+| Video Length | This Project (MPS) | WhisperX (CPU) | WhisperX (Est. CUDA) |
+|-------------|-------------------|----------------|---------------------|
+| 90 seconds  | ~45 seconds       | ~60 seconds    | ~30 seconds         |
+| 3 minutes   | ~55 seconds       | ~2 minutes     | ~1 minute           |
+| 31 minutes  | ~10 minutes       | ~20 minutes    | ~8 minutes          |
 
-**結論：**
-- 在 Apple Silicon 上，本專案使用 MPS 更快
-- 在 NVIDIA GPU 上，WhisperX 使用 CUDA 最快
-- 在 CPU 上，兩者差不多
+**Conclusion:**
+- On Apple Silicon, this project using MPS is faster
+- On NVIDIA GPU, WhisperX using CUDA is fastest
+- On CPU, both are similar
 
-## 優缺點總結
+## Pros and Cons Summary
 
-### 本專案優勢
+### This Project Advantages
 
-✅ **Apple Silicon 原生優化**
-- 充分利用 M1/M2/M3 的 Neural Engine 和 MPS
-- 不需要 Rosetta 轉譯
+✅ **Apple Silicon Native Optimization**
+- Fully utilizes M1/M2/M3's Neural Engine and MPS
+- No Rosetta translation needed
 
-✅ **簡單易用**
-- 單一腳本執行
-- 最少的依賴
-- 清晰的參數
+✅ **Simple and Easy to Use**
+- Single script execution
+- Minimal dependencies
+- Clear parameters
 
-✅ **最新 pyannote.audio 4.x**
-- 支援最新的說話人分離模型
-- 更好的準確度
+✅ **Latest pyannote.audio 4.x**
+- Supports latest speaker diarization models
+- Better accuracy
 
-✅ **輕量級**
-- 不需要額外的對齊模型
-- 安裝快速
+✅ **Lightweight**
+- No additional alignment models needed
+- Fast installation
 
-### 本專案劣勢
+### This Project Disadvantages
 
-❌ **僅支援 macOS (Apple Silicon)**
-- 無法在 Intel Mac、Linux、Windows 運行
+❌ **macOS Only (Apple Silicon)**
+- Cannot run on Intel Mac, Linux, Windows
 
-❌ **時間戳精度較低**
-- 無強制對齊，精度約 ±0.1-0.5 秒
+❌ **Lower Timestamp Precision**
+- No forced alignment, precision ~±0.1-0.5 seconds
 
-❌ **功能較少**
-- 無翻譯功能
-- 無批次處理
-- 輸出格式單一
+❌ **Fewer Features**
+- No translation feature
+- No batch processing
+- Single output format
 
-❌ **無 CLI 整合**
-- 需要手動合併 ASR 和說話人分離結果
+❌ **No CLI Integration**
+- Manual merge of ASR and speaker diarization results needed
 
-### WhisperX 優勢
+### WhisperX Advantages
 
-✅ **跨平台支援**
-- Linux, Windows, macOS 都可運行
+✅ **Cross-Platform Support**
+- Runs on Linux, Windows, macOS
 
-✅ **時間戳精度高**
-- 毫秒級對齊
+✅ **High Timestamp Precision**
+- Millisecond-level alignment
 
-✅ **功能完整**
-- 內建翻譯
-- 批次處理
-- 多種輸出格式
+✅ **Complete Features**
+- Built-in translation
+- Batch processing
+- Multiple output formats
 
-✅ **整合度高**
-- 一條命令完成所有步驟
+✅ **High Integration**
+- One command completes all steps
 
-✅ **效能優化**
-- int8 量化
-- 批次推理
+✅ **Performance Optimization**
+- int8 quantization
+- Batch inference
 
-### WhisperX 劣勢
+### WhisperX Disadvantages
 
-❌ **在 Apple Silicon 上效能較差**
-- 需要透過 Rosetta 或 CPU 模式
-- 無法使用 MPS GPU
+❌ **Poor Performance on Apple Silicon**
+- Requires Rosetta or CPU mode
+- Cannot use MPS GPU
 
-❌ **安裝複雜**
-- 需要更多依賴
-- 可能有版本衝突
+❌ **Complex Installation**
+- More dependencies needed
+- Possible version conflicts
 
-❌ **記憶體需求較高**
-- 需要載入對齊模型
+❌ **Higher Memory Requirements**
+- Need to load alignment models
 
-## 使用建議
+## Usage Recommendations
 
-### 選擇本專案，如果你：
+### Choose This Project If You:
 
-1. ✅ 使用 Apple Silicon Mac (M1/M2/M3)
-2. ✅ 只需要基本的 ASR + 說話人分離
-3. ✅ 想要最快的處理速度（在 Mac 上）
-4. ✅ 偏好簡單的安裝和使用
-5. ✅ 時間戳精度要求不高（±0.5 秒可接受）
+1. ✅ Use Apple Silicon Mac (M1/M2/M3)
+2. ✅ Only need basic ASR + speaker diarization
+3. ✅ Want fastest processing speed (on Mac)
+4. ✅ Prefer simple installation and usage
+5. ✅ Timestamp precision requirement not high (±0.5 seconds acceptable)
 
-### 選擇 WhisperX，如果你：
+### Choose WhisperX If You:
 
-1. ✅ 使用 NVIDIA GPU (Linux/Windows)
-2. ✅ 需要毫秒級時間戳精度
-3. ✅ 需要翻譯功能
-4. ✅ 需要批次處理多個檔案
-5. ✅ 需要多種輸出格式 (JSON, SRT, VTT)
-6. ✅ 需要跨平台支援
+1. ✅ Use NVIDIA GPU (Linux/Windows)
+2. ✅ Need millisecond-level timestamp precision
+3. ✅ Need translation features
+4. ✅ Need batch processing of multiple files
+5. ✅ Need multiple output formats (JSON, SRT, VTT)
+6. ✅ Need cross-platform support
 
-## 混合方案
+## Hybrid Solution
 
-理論上可以結合兩者優勢，但有限制：
+Theoretically can combine advantages of both, but with limitations:
 
 ```bash
-# 在 Mac 上使用本專案快速轉錄
+# Use this project for fast transcription on Mac
 ./asr.sh video.mp4 transcript.txt
 
-# ⚠️ 注意：WhisperX 在 Apple Silicon 上需要特殊設定
-# 需要安裝 x86_64 版本的 Python 或使用 Rosetta
-# 且 --align-only 需要音訊檔案，不是文字檔案
+# ⚠️ Note: WhisperX on Apple Silicon requires special setup
+# Need to install x86_64 version of Python or use Rosetta
+# And --align-only requires audio file, not text file
 ```
 
-**實際上，在 Apple Silicon Mac 上：**
+**In practice, on Apple Silicon Mac:**
 
-1. **本專案已經提供字級時間戳**，對大多數應用已經足夠
-2. **WhisperX 在 M1/M2/M3 上效能較差**，因為：
-   - 需要透過 Rosetta 運行（x86_64 模式）
-   - 無法使用 MPS GPU
-   - 強制對齊需要額外的模型和時間
+1. **This project already provides word-level timestamps**, sufficient for most applications
+2. **WhisperX performs poorly on M1/M2/M3** because:
+   - Needs to run through Rosetta (x86_64 mode)
+   - Cannot use MPS GPU
+   - Forced alignment requires additional models and time
 
-3. **如果真的需要更精確的時間戳**，建議：
+3. **If you really need more precise timestamps**, recommend:
    ```bash
-   # 方案 A：直接使用 WhisperX（但會比本專案慢）
+   # Option A: Use WhisperX directly (but slower than this project)
    whisperx video.mp4 --model large-v3 --diarize --hf_token YOUR_TOKEN
    
-   # 方案 B：使用本專案，接受 ±0.5 秒的精度
+   # Option B: Use this project, accept ±0.5 second precision
    ./asr.sh video.mp4 transcript.txt
    ```
 
-**結論：**
-- 在 Apple Silicon Mac 上，**不建議混合使用**
-- 本專案已經是 Mac 上的最佳方案
-- 如果需要毫秒級精度，建議在 Linux + NVIDIA GPU 上使用 WhisperX
+**Conclusion:**
+- On Apple Silicon Mac, **hybrid use not recommended**
+- This project is already the best solution for Mac
+- If millisecond-level precision needed, recommend using WhisperX on Linux + NVIDIA GPU
 
-## 結論
+## Conclusion
 
-- **本專案**：專為 Apple Silicon 優化的輕量級方案
-- **WhisperX**：功能完整的跨平台企業級方案
+- **This Project**: Lightweight solution optimized for Apple Silicon
+- **WhisperX**: Feature-complete cross-platform enterprise solution
 
-兩者都使用 pyannote.audio 進行說話人分離，核心差異在於：
-1. ASR 引擎（MLX vs CTranslate2）
-2. 硬體優化（MPS vs CUDA）
-3. 功能完整度（簡單 vs 完整）
+Both use pyannote.audio for speaker diarization, core differences are:
+1. ASR engine (MLX vs CTranslate2)
+2. Hardware optimization (MPS vs CUDA)
+3. Feature completeness (simple vs complete)
 
-選擇取決於你的硬體環境和需求！
+Choice depends on your hardware environment and requirements!

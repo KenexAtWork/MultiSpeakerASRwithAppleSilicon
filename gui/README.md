@@ -1,219 +1,219 @@
-# ASR Multi-Speaker Transcription - GUI 版本
+# ASR Multi-Speaker Transcription - GUI Version
 
-使用 PyQt6 建立的圖形界面版本。
+Graphical interface version built with PyQt6.
 
-## 功能特色
+## Features
 
-- ✅ 拖放檔案支援
-- ✅ 即時處理進度顯示
-- ✅ 處理日誌即時更新
-- ✅ 支援多種語言和模型選擇
-- ✅ 可選擇輸出格式（SRT/TXT）
-- ✅ 背景處理，UI 不凍結
+- ✅ Drag and drop file support
+- ✅ Real-time processing progress display
+- ✅ Real-time processing log updates
+- ✅ Support for multiple languages and model selection
+- ✅ Selectable output format (SRT/TXT)
+- ✅ Background processing, UI doesn't freeze
 
-## 系統需求
+## System Requirements
 
-- macOS（支援 Apple Silicon M1/M2/M3）
-- Python 3.10（重要：PyQt6 目前不支援 Python 3.11+）
-- 16GB RAM（建議）
+- macOS (supports Apple Silicon M1/M2/M3)
+- Python 3.10 (Important: PyQt6 currently doesn't support Python 3.11+)
+- 16GB RAM (recommended)
 
-## 安裝
+## Installation
 
-### 快速開始（推薦）
+### Quick Start (Recommended)
 
 ```bash
-# 1. 建立 Python 3.10 虛擬環境
+# 1. Create Python 3.10 virtual environment
 python3.10 -m venv .venv
 
-# 2. 啟動虛擬環境
+# 2. Activate virtual environment
 source .venv/bin/activate
 
-# 3. 安裝所有套件
+# 3. Install all packages
 pip install mlx-whisper pyannote-audio PyQt6
 
-# 4. 設定 Hugging Face Token
+# 4. Configure Hugging Face Token
 cp .env.example .env
-# 編輯 .env 並填入你的 HF_TOKEN
+# Edit .env and add your HF_TOKEN
 
-# 5. 啟動 GUI
+# 5. Launch GUI
 ./run_gui.sh
 ```
 
-### 詳細安裝步驟
+### Detailed Installation Steps
 
-#### 方式 1：使用標準 venv（推薦）
+#### Method 1: Using Standard venv (Recommended)
 
 ```bash
-# 確認 Python 版本（必須是 3.10）
+# Check Python version (must be 3.10)
 python3.10 --version
 
-# 建立虛擬環境
+# Create virtual environment
 python3.10 -m venv .venv
 
-# 啟動環境
+# Activate environment
 source .venv/bin/activate
 
-# 安裝套件
+# Install packages
 pip install mlx-whisper pyannote-audio PyQt6
 
-# 啟動 GUI
+# Launch GUI
 ./run_gui.sh
 ```
 
-#### 方式 2：使用 Homebrew Python 3.10
+#### Method 2: Using Homebrew Python 3.10
 
-如果系統沒有 Python 3.10：
+If system doesn't have Python 3.10:
 
 ```bash
-# 安裝 Python 3.10
+# Install Python 3.10
 brew install python@3.10
 
-# 建立虛擬環境
+# Create virtual environment
 /opt/homebrew/bin/python3.10 -m venv .venv
 
-# 啟動環境
+# Activate environment
 source .venv/bin/activate
 
-# 安裝套件
+# Install packages
 pip install mlx-whisper pyannote-audio PyQt6
 
-# 啟動 GUI
+# Launch GUI
 ./run_gui.sh
 ```
 
-#### 重要提醒
+#### Important Notes
 
-- PyQt6 目前僅支援 Python 3.10，不支援 3.11 或更新版本
-- 如果遇到 `ModuleNotFoundError: No module named 'PyQt6'`，請確認：
-  1. 虛擬環境已正確啟動
-  2. PyQt6 已安裝在虛擬環境中（不是系統 Python）
-  3. Python 版本是 3.10
+- PyQt6 currently only supports Python 3.10, not 3.11 or newer
+- If you encounter `ModuleNotFoundError: No module named 'PyQt6'`, check:
+  1. Virtual environment is properly activated
+  2. PyQt6 is installed in virtual environment (not system Python)
+  3. Python version is 3.10
 
-### 環境變數設定
+### Environment Variable Configuration
 
-確保已設定 `HF_TOKEN`：
+Ensure `HF_TOKEN` is configured:
 
 ```bash
-# 複製範例檔案
+# Copy example file
 cp .env.example .env
 
-# 編輯 .env 並填入你的 token
+# Edit .env and add your token
 # HF_TOKEN=your_huggingface_token_here
 ```
 
-## 使用方式
+## Usage
 
-### 啟動 GUI
+### Launch GUI
 
 ```bash
-# 從 gui 目錄啟動
+# Launch from gui directory
 cd gui
 python main.py
 
-# 或從 asr 目錄啟動
+# Or launch from asr directory
 python gui/main.py
 ```
 
-### 使用步驟
+### Usage Steps
 
-1. **選擇檔案**
-   - 拖放影片檔案到視窗中
-   - 或點擊「選擇檔案」按鈕
+1. **Select File**
+   - Drag and drop video file into window
+   - Or click "Select File" button
 
-2. **設定參數**
-   - 選擇語言（中文/英文/日文/自動）
-   - 選擇模型大小（tiny/base/small/medium/large）
-   - 選擇輸出格式（SRT/TXT）
-   - 可選：跳過說話者分離
-   - 可選：停用 GPU 加速
+2. **Configure Parameters**
+   - Select language (Chinese/English/Japanese/Auto)
+   - Select model size (tiny/base/small/medium/large)
+   - Select output format (SRT/TXT)
+   - Optional: Skip speaker diarization
+   - Optional: Disable GPU acceleration
 
-3. **開始處理**
-   - 點擊「開始轉錄」按鈕
-   - 觀察進度條和日誌輸出
-   - 等待處理完成
+3. **Start Processing**
+   - Click "Start Transcription" button
+   - Watch progress bar and log output
+   - Wait for processing to complete
 
-4. **查看結果**
-   - 處理完成後會顯示通知
-   - 點擊「開啟輸出資料夾」查看結果
+4. **View Results**
+   - Notification appears when processing completes
+   - Click "Open Output Folder" to view results
 
-## 專案結構
+## Project Structure
 
 ```
 gui/
-├── main.py              # 主程式入口
+├── main.py              # Main program entry
 ├── ui/
 │   ├── __init__.py
-│   └── main_window.py   # 主視窗 UI
+│   └── main_window.py   # Main window UI
 ├── core/
 │   ├── __init__.py
-│   └── asr_worker.py    # 背景處理 Worker
+│   └── asr_worker.py    # Background processing Worker
 ├── utils/
 │   └── __init__.py
-├── resources/           # 資源檔案（圖示等）
-├── requirements.txt     # Python 套件需求
-└── README.md           # 本檔案
+├── resources/           # Resource files (icons, etc.)
+├── requirements.txt     # Python package requirements
+└── README.md           # This file
 ```
 
-## 技術細節
+## Technical Details
 
-### 架構
+### Architecture
 
-- **PyQt6**: 跨平台 GUI 框架
-- **QThread**: 背景執行 ASR，避免 UI 凍結
-- **Signal/Slot**: 更新進度和日誌
-- **拖放支援**: QDragDrop 實作
+- **PyQt6**: Cross-platform GUI framework
+- **QThread**: Background ASR execution, prevents UI freezing
+- **Signal/Slot**: Update progress and logs
+- **Drag and Drop**: QDragDrop implementation
 
-### 關鍵組件
+### Key Components
 
 1. **MainWindow** (`ui/main_window.py`)
-   - 主視窗 UI
-   - 處理用戶互動
-   - 顯示進度和日誌
+   - Main window UI
+   - Handles user interactions
+   - Displays progress and logs
 
 2. **ASRWorker** (`core/asr_worker.py`)
-   - 在背景執行緒中執行 ASR
-   - 發送進度和日誌信號
-   - 處理錯誤
+   - Executes ASR in background thread
+   - Sends progress and log signals
+   - Handles errors
 
 3. **DropZone** (`ui/main_window.py`)
-   - 自定義拖放區域
-   - 支援拖放檔案
+   - Custom drag and drop area
+   - Supports file drag and drop
 
-## 未來改進
+## Future Improvements
 
-- [ ] 批次處理多個檔案
-- [ ] 儲存和載入設定
-- [ ] 處理歷史記錄
-- [ ] 更詳細的進度顯示（各階段進度）
-- [ ] 支援取消處理
-- [ ] 打包成 .app（使用 py2app）
-- [ ] 支援更多輸出格式
-- [ ] 預覽轉錄結果
+- [ ] Batch processing of multiple files
+- [ ] Save and load settings
+- [ ] Processing history
+- [ ] More detailed progress display (per-stage progress)
+- [ ] Support for canceling processing
+- [ ] Package as .app (using py2app)
+- [ ] Support more output formats
+- [ ] Preview transcription results
 
-## 打包成 macOS App
+## Package as macOS App
 
-（待實作）
+(To be implemented)
 
 ```bash
-# 使用 py2app 打包
+# Package using py2app
 pip install py2app
 python setup.py py2app
 ```
 
-## 疑難排解
+## Troubleshooting
 
-### 問題：找不到 asr_multi_speaker_v5_fast 模組
+### Problem: Cannot find asr_multi_speaker_v5_fast module
 
-確保從正確的目錄啟動，或檢查 `sys.path` 設定。
+Ensure launching from correct directory, or check `sys.path` configuration.
 
-### 問題：UI 凍結
+### Problem: UI freezes
 
-確認 ASR 處理是在 QThread 中執行，而非主執行緒。
+Confirm ASR processing is executing in QThread, not main thread.
 
-### 問題：無法拖放檔案
+### Problem: Cannot drag and drop files
 
-檢查 `setAcceptDrops(True)` 是否正確設定。
+Check if `setAcceptDrops(True)` is properly configured.
 
-## 授權
+## License
 
 MIT License

@@ -1,137 +1,137 @@
-# 分發指南
+# Distribution Guide
 
-本文件說明如何打包和分發此專案給其他使用者。
+This document explains how to package and distribute this project to other users.
 
-## 打包方式
+## Packaging Method
 
-使用 git archive 打包（最乾淨的方式）：
+Use git archive for packaging (cleanest method):
 
 ```bash
 git archive --format=tar.gz --prefix=MultiSpeakerASR/ -o MultiSpeakerASR.tar.gz HEAD
 ```
 
-這會產生 `MultiSpeakerASR.tar.gz` 檔案，包含所有 Git 追蹤的檔案，但不包含：
-- `.git/` 目錄
-- `.venv/` 虛擬環境
-- `__pycache__/` 快取
-- `.env` 環境變數
-- 其他 `.gitignore` 中的檔案
+This creates a `MultiSpeakerASR.tar.gz` file containing all Git-tracked files, but excluding:
+- `.git/` directory
+- `.venv/` virtual environment
+- `__pycache__/` cache
+- `.env` environment variables
+- Other files in `.gitignore`
 
-## 接收者使用步驟
+## Recipient Usage Steps
 
-### 1. 解壓縮
+### 1. Extract
 
 ```bash
 tar -xzf MultiSpeakerASR.tar.gz
 cd MultiSpeakerASR
 ```
 
-### 2. 執行安裝
+### 2. Run Installation
 
 ```bash
 ./install.sh
 ```
 
-安裝腳本會自動：
-- 檢查 Python 版本
-- 安裝 uv（如果需要）
-- 建立虛擬環境
-- 安裝所有依賴
-- 建立 .env 檔案
+The installation script will automatically:
+- Check Python version
+- Install uv (if needed)
+- Create virtual environment
+- Install all dependencies
+- Create .env file
 
-### 3. 設定環境變數
+### 3. Configure Environment Variables
 
-編輯 `.env` 檔案：
+Edit the `.env` file:
 
 ```bash
 nano .env
 ```
 
-填入必要資訊：
-- `HF_TOKEN` - Hugging Face token（用於說話者分離）
-- `AWS_REGION` - AWS 區域（用於摘要功能，可選）
-- `AWS_PROFILE` - AWS profile（預設為 default）
+Fill in required information:
+- `HF_TOKEN` - Hugging Face token (for speaker diarization)
+- `AWS_REGION` - AWS region (for summarization, optional)
+- `AWS_PROFILE` - AWS profile (defaults to default)
 
-### 4. 啟動 GUI
+### 4. Launch GUI
 
 ```bash
 ./run_gui.sh
 ```
 
-## 打包內容
+## Package Contents
 
-打包檔案包含：
-- ✅ 所有原始碼
-- ✅ 安裝腳本
-- ✅ 文件和範例
-- ✅ 測試檔案
-- ❌ 不包含虛擬環境（.venv）
-- ❌ 不包含快取檔案（__pycache__）
-- ❌ 不包含環境變數（.env）
-- ❌ 不包含 Git 歷史（.git）
+The package includes:
+- ✅ All source code
+- ✅ Installation scripts
+- ✅ Documentation and examples
+- ✅ Test files
+- ❌ Does not include virtual environment (.venv)
+- ❌ Does not include cache files (__pycache__)
+- ❌ Does not include environment variables (.env)
+- ❌ Does not include Git history (.git)
 
-## 系統需求
+## System Requirements
 
-接收者需要：
-- macOS with Apple Silicon (M1/M2/M3/M4 或更新)
-- Python 3.10+（如果沒有，uv 會自動下載）
-- 網路連線（用於下載依賴和 AI 模型）
-- 至少 8GB RAM（建議 16GB）
+Recipients need:
+- macOS with Apple Silicon (M1/M2/M3/M4 or newer)
+- Python 3.10+ (if not available, uv will automatically download)
+- Internet connection (for downloading dependencies and AI models)
+- At least 8GB RAM (16GB recommended)
 
-## 首次執行
+## First Run
 
-首次執行會自動下載 AI 模型：
-- Whisper 模型：約 1.5 GB
-- Speaker Diarization 模型：約 200 MB（如果使用）
+First run will automatically download AI models:
+- Whisper model: ~1.5 GB
+- Speaker Diarization model: ~200 MB (if used)
 
-下載時間視網路速度而定（約 2-8 分鐘）。
+Download time depends on network speed (~2-8 minutes).
 
-## 離線使用
+## Offline Usage
 
-如果需要完全離線使用：
+For completely offline usage:
 
-1. 在有網路的機器上完整安裝並執行一次
-2. 打包時包含快取目錄：
+1. Complete installation and run once on a machine with internet
+2. Package with cache directories:
    ```bash
    tar -czf MultiSpeakerASR-with-models.tar.gz \
      MultiSpeakerASR/ \
      ~/.cache/huggingface/hub/models--mlx-community--whisper-medium-mlx \
      ~/.cache/huggingface/hub/models--pyannote--speaker-diarization-3.1
    ```
-3. 在目標機器上解壓並恢復快取
+3. Extract on target machine and restore cache
 
-## 疑難排解
+## Troubleshooting
 
-### 權限問題
+### Permission Issues
 
-如果腳本無法執行：
+If scripts cannot execute:
 
 ```bash
 chmod +x install.sh run_gui.sh run_tests.sh
 chmod +x scripts/*.sh
 ```
 
-### Python 版本問題
+### Python Version Issues
 
-如果系統 Python 版本太舊，`install.sh` 會自動使用 uv 下載 Python 3.10。
+If system Python version is too old, `install.sh` will automatically use uv to download Python 3.10.
 
-### 依賴安裝失敗
+### Dependency Installation Failure
 
-確保有穩定的網路連線，然後重新執行：
+Ensure stable internet connection, then re-run:
 
 ```bash
 ./install.sh
 ```
 
-## 更新
+## Updates
 
-如果需要更新到新版本：
+To update to a new version:
 
-1. 從 GitHub 下載最新版本
-2. 或使用新的打包檔案
-3. 重新執行 `./install.sh`
+1. Download latest version from GitHub
+2. Or use new package file
+3. Re-run `./install.sh`
 
-## 支援
+## Support
 
 - GitHub: https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon
 - Issues: https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon/issues

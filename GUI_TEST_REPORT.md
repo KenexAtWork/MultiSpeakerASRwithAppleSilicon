@@ -1,92 +1,92 @@
-# GUI 測試報告
+# GUI Test Report
 
-## 測試環境
+## Test Environment
 - Python: 3.10
 - PyQt6: 6.10.2
-- 測試日期: 2026-02-13
-- 測試檔案: examples/sample-01.mp4 (59 秒影片)
+- Test Date: 2026-02-13
+- Test File: examples/sample-01.mp4 (59-second video)
 
-## 測試項目
+## Test Items
 
-### ✅ 1. 套件安裝測試
-- PyQt6 安裝成功
-- mlx-whisper 已安裝
-- pyannote-audio 已安裝
-- 所有依賴套件正常
+### ✅ 1. Package Installation Test
+- PyQt6 installed successfully
+- mlx-whisper installed
+- pyannote-audio installed
+- All dependency packages normal
 
-### ✅ 2. GUI 組件導入測試
-- MainWindow 導入成功
-- ASRWorker 導入成功
-- 無語法錯誤
+### ✅ 2. GUI Component Import Test
+- MainWindow imported successfully
+- ASRWorker imported successfully
+- No syntax errors
 
-### ✅ 3. GUI 界面顯示測試
-- 視窗正常顯示
-- 視窗大小: 800x700
-- 視窗標題正確
-- 無渲染錯誤
+### ✅ 3. GUI Interface Display Test
+- Window displays normally
+- Window size: 800x700
+- Window title correct
+- No rendering errors
 
-### ✅ 4. ASR Worker 處理測試
-- 成功載入 Whisper 模型 (medium)
-- ASR 轉錄完成 (16 秒, 3.63x 即時速度)
-- 說話者分離完成 (23 秒, 2.52x 即時速度)
-- 總處理時間: 40 秒 (1.49x 即時速度)
-- 輸出檔案生成成功
-- 檔案大小: 2837 bytes
-- 字幕段落: 39 個
-- 偵測說話者: 2 位 (SPEAKER_00, SPEAKER_01)
+### ✅ 4. ASR Worker Processing Test
+- Successfully loaded Whisper model (medium)
+- ASR transcription completed (16 seconds, 3.63x realtime speed)
+- Speaker diarization completed (23 seconds, 2.52x realtime speed)
+- Total processing time: 40 seconds (1.49x realtime speed)
+- Output file generated successfully
+- File size: 2837 bytes
+- Subtitle segments: 39
+- Detected speakers: 2 (SPEAKER_00, SPEAKER_01)
 
-### ✅ 5. 輸出格式驗證
-- SRT 格式正確
-- 時間碼格式正確
-- 說話者標記正確
-- 中文字幕正常顯示
+### ✅ 5. Output Format Validation
+- SRT format correct
+- Timestamp format correct
+- Speaker labels correct
+- Chinese subtitles display normally
 
-## 測試結果
+## Test Results
 
-### 所有測試通過 ✅
+### All Tests Passed ✅
 
-GUI 應用程式可以正常運行，包括：
-1. 界面顯示正常
-2. 背景處理正常
-3. ASR 轉錄功能正常
-4. 說話者分離功能正常
-5. 檔案輸出正常
+GUI application runs normally, including:
+1. Interface displays normally
+2. Background processing normal
+3. ASR transcription function normal
+4. Speaker diarization function normal
+5. File output normal
 
-## 已知問題
+## Known Issues
 
-無
+None
 
-## 建議
+## Recommendations
 
-1. 可以開始使用 GUI 進行實際測試
-2. 建議使用 `./run_gui.sh` 啟動
-3. 確保 `.env` 檔案中已設定 `HF_TOKEN`
+1. Can start using GUI for actual testing
+2. Recommend using `./run_gui.sh` to launch
+3. Ensure `HF_TOKEN` is configured in `.env` file
 
-## 啟動方式
+## Launch Method
 
 ```bash
 cd ~/Utils/asr
 ./run_gui.sh
 ```
 
-## 功能特色
+## Feature Highlights
 
-- ✅ 拖放檔案支援
-- ✅ 即時處理進度顯示
-- ✅ 處理日誌即時更新
-- ✅ 支援多種語言和模型選擇
-- ✅ 可選擇輸出格式（SRT/TXT）
-- ✅ 背景處理，UI 不凍結
-- ✅ 支援 Apple Silicon GPU 加速
+- ✅ Drag and drop file support
+- ✅ Real-time processing progress display
+- ✅ Real-time processing log updates
+- ✅ Support for multiple languages and model selection
+- ✅ Selectable output format (SRT/TXT)
+- ✅ Background processing, UI doesn't freeze
+- ✅ Support for Apple Silicon GPU acceleration
 
-## 測試命令
+## Test Commands
 
-如需重新測試：
+To re-test:
 
 ```bash
-# 測試 GUI 顯示
+# Test GUI display
 .venv/bin/python test_gui_display.py
 
-# 測試 ASR 處理
+# Test ASR processing
 .venv/bin/python test_gui_processing.py
 ```

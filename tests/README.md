@@ -1,266 +1,266 @@
-# ASR 自動化測試
+# ASR Automated Testing
 
-本目錄包含 ASR Multi-Speaker 專案的自動化測試。
+This directory contains automated tests for the ASR Multi-Speaker project.
 
-## 測試覆蓋範圍
+## Test Coverage
 
-詳細的測試覆蓋範圍文件請參考：[TEST_COVERAGE.md](./TEST_COVERAGE.md)
+For detailed test coverage documentation, see: [TEST_COVERAGE.md](./TEST_COVERAGE.md)
 
-## 快速開始
+## Quick Start
 
-### 一鍵執行所有測試
+### Run All Tests with One Command
 
 ```bash
 cd asr
 
-# 快速模式（推薦，約 20 秒）
+# Fast mode (recommended, ~20 seconds)
 ./run_tests.sh --fast
 
-# 完整模式（含 diarization，約 60 秒）
+# Full mode (with diarization, ~60 seconds)
 ./run_tests.sh
 
-# 只執行特定測試
+# Run specific test only
 ./run_tests.sh --test pipeline
 ./run_tests.sh --test merge
 
-# 顯示詳細輸出
+# Show verbose output
 ./run_tests.sh --fast --verbose
 
-# 查看所有選項
+# View all options
 ./run_tests.sh --help
 ```
 
-### 手動執行個別測試
+### Manually Run Individual Tests
 
 ```bash
 cd asr
 
-# 快速測試（跳過 diarization，約 20 秒）
+# Fast tests (skip diarization, ~20 seconds)
 .venv/bin/python tests/test_pipeline_e2e.py --fast
 .venv/bin/python tests/test_merge_srt.py
 .venv/bin/python tests/test_gui_media_url.py
 .venv/bin/python tests/test_srt_parser.py
 .venv/bin/python tests/test_error_handling.py
 
-# 完整測試（含 diarization，約 60 秒）
+# Full tests (with diarization, ~60 seconds)
 .venv/bin/python tests/test_pipeline_e2e.py
 ```
 
-### 個別測試說明
+### Individual Test Descriptions
 
-#### 1. Pipeline 端到端測試 (`test_pipeline_e2e.py`)
+#### 1. Pipeline End-to-End Test (`test_pipeline_e2e.py`)
 
-測試完整 ASR 轉錄流程，包含 Whisper ASR、說話者分離、段落合併。
+Tests complete ASR transcription pipeline, including Whisper ASR, speaker diarization, segment merging.
 
 ```bash
-# 快速模式（Whisper base，跳過 diarization）
+# Fast mode (Whisper base, skip diarization)
 .venv/bin/python tests/test_pipeline_e2e.py --fast
 
-# 完整模式（Whisper base + diarization）
+# Full mode (Whisper base + diarization)
 .venv/bin/python tests/test_pipeline_e2e.py
 
-# 指定模型
+# Specify model
 .venv/bin/python tests/test_pipeline_e2e.py --model medium
 ```
 
-**測試項目：**
-- SRT 輸出檔案存在且非空
-- SRT 格式正確（index、時間戳、文字）
-- 時間戳遞增
-- index 連續編號
-- skip diarization 時全部標為 Unknown
-- language=auto 不報錯
-- TXT 格式輸出
-- 合併步驟有效
-- diarization 偵測到 ≥2 位說話者
-- 合併步驟減少段落數
-- Unknown 段落未被合併
+**Test Items:**
+- SRT output file exists and non-empty
+- SRT format correct (index, timestamp, text)
+- Timestamps increasing
+- Index sequential numbering
+- All marked as Unknown when skip diarization
+- language=auto doesn't error
+- TXT format output
+- Merge step effective
+- Diarization detects ≥2 speakers
+- Merge step reduces segment count
+- Unknown segments not merged
 
-#### 2. 合併功能測試 (`test_merge_srt.py`)
+#### 2. Merge Function Test (`test_merge_srt.py`)
 
-測試同 speaker 相鄰段落合併邏輯。
+Tests same speaker adjacent segment merge logic.
 
 ```bash
-# 單元測試
+# Unit test
 .venv/bin/python tests/test_merge_srt.py
 
-# 整合測試（指定實際 SRT 檔案）
+# Integration test (specify actual SRT file)
 .venv/bin/python tests/test_merge_srt.py --srt path/to/file.srt
 ```
 
-**測試項目：**
-- 空輸入處理
-- 單一段落處理
-- 同 speaker 合併
-- 不同 speaker 不合併
-- Unknown speaker 不合併
-- 間隔限制（max_gap）
-- 時長限制（max_duration）
-- 字數限制（max_chars）
-- index 連續編號
-- 時間戳有效性
-- 文字不丟失
-- skip diarization 場景
+**Test Items:**
+- Empty input handling
+- Single segment handling
+- Same speaker merging
+- Different speaker no merge
+- Unknown speaker no merge
+- Gap limit (max_gap)
+- Duration limit (max_duration)
+- Character limit (max_chars)
+- Index sequential numbering
+- Timestamp validity
+- Text not lost
+- Skip diarization scenario
 
-#### 3. GUI 媒體播放器測試 (`test_gui_media_url.py`)
+#### 3. GUI Media Player Test (`test_gui_media_url.py`)
 
-測試 QMediaPlayer 對中文/特殊字元檔名的支援。
+Tests QMediaPlayer support for Chinese/special character filenames.
 
 ```bash
 .venv/bin/python tests/test_gui_media_url.py
 ```
 
-**測試項目：**
-- 中文路徑 QUrl 轉換
-- 空格路徑 QUrl 轉換
-- 中英混合路徑處理
-- 實際暫存檔案 round-trip
-- QMediaPlayer 接受中文 URL
-- 實際音檔載入
+**Test Items:**
+- Chinese path QUrl conversion
+- Space path QUrl conversion
+- Mixed Chinese-English path handling
+- Actual temp file round-trip
+- QMediaPlayer accepts Chinese URL
+- Actual audio file loading
 
-#### 4. SRT 解析測試 (`test_srt_parser.py`)
+#### 4. SRT Parser Test (`test_srt_parser.py`)
 
-測試 GUI 中的 SRT 解析邏輯。
+Tests SRT parsing logic in GUI.
 
 ```bash
 .venv/bin/python tests/test_srt_parser.py
 ```
 
-**測試項目：**
-- 基本 SRT 格式解析
-- 多行文字處理
-- 時間戳轉換正確性
-- 中文字元處理
-- 空檔案處理
-- 格式錯誤的時間戳
-- 缺少文字內容
-- 額外空行處理
-- time_str 欄位保留
-- 實際 SRT 檔案測試
-- 特殊字元處理
-- 零時長段落
+**Test Items:**
+- Basic SRT format parsing
+- Multi-line text handling
+- Timestamp conversion correctness
+- Chinese character handling
+- Empty file handling
+- Malformed timestamps
+- Missing text content
+- Extra blank line handling
+- time_str field preservation
+- Actual SRT file testing
+- Special character handling
+- Zero duration segments
 
-#### 5. 錯誤處理測試 (`test_error_handling.py`)
+#### 5. Error Handling Test (`test_error_handling.py`)
 
-測試 ASR Pipeline 在各種錯誤情況下的行為。
+Tests ASR Pipeline behavior in various error conditions.
 
 ```bash
 .venv/bin/python tests/test_error_handling.py
 ```
 
-**測試項目：**
-- 檔案不存在時應報錯
-- 無效的模型名稱
-- 無效的語言代碼
-- 沒有 HF token 但要求 diarization
-- 無效的輸出格式
-- 輸出到唯讀目錄
-- 損壞的影片檔案
-- 空的影片檔案
+**Test Items:**
+- Should error when file doesn't exist
+- Invalid model name
+- Invalid language code
+- No HF token but require diarization
+- Invalid output format
+- Output to read-only directory
+- Corrupted video file
+- Empty video file
 
-## 測試環境需求
+## Test Environment Requirements
 
-### 必要套件
+### Required Packages
 ```bash
-# 已在 .venv 中安裝
+# Already installed in .venv
 pip install PyQt6 mlx-whisper pyannote.audio boto3
 ```
 
-### 環境變數
+### Environment Variables
 ```bash
-# .env 檔案
-HF_TOKEN=your_huggingface_token  # diarization 測試需要
+# .env file
+HF_TOKEN=your_huggingface_token  # Required for diarization tests
 ```
 
-### 測試資料
-- `examples/sample-01.mp4` - 60秒測試音檔（2 speakers）
-- 其他實際音檔可用於整合測試
+### Test Data
+- `examples/sample-01.mp4` - 60-second test audio (2 speakers)
+- Other actual audio files can be used for integration testing
 
-## 測試結果範例
+## Test Result Examples
 
-### 成功輸出
+### Success Output
 ```
 ============================================================
-ASR Pipeline 端到端測試 (model=base)
-音檔: /path/to/asr/examples/sample-01.mp4
-模式: 快速（無 diarization）
+ASR Pipeline End-to-End Test (model=base)
+Audio: /path/to/asr/examples/sample-01.mp4
+Mode: Fast (no diarization)
 ============================================================
-  ✓ SRT 輸出檔案存在且非空
-  ✓ SRT 格式正確（index、時間戳、文字）
-  ✓ 時間戳遞增
-  ✓ index 連續編號
-  ✓ skip diarization 時全部標為 Unknown
-  ✓ language=auto 不報錯
-  ✓ TXT 格式輸出
-  ✓ 合併步驟有生效（段落數合理）
+  ✓ SRT output file exists and non-empty
+  ✓ SRT format correct (index, timestamp, text)
+  ✓ Timestamps increasing
+  ✓ Index sequential numbering
+  ✓ All marked as Unknown when skip diarization
+  ✓ language=auto doesn't error
+  ✓ TXT format output
+  ✓ Merge step effective (reasonable segment count)
   [basic] 16.2s
 
-結果: 8 通過, 0 失敗
-✓ 全部通過
+Result: 8 passed, 0 failed
+✓ All passed
 ```
 
-## 持續整合
+## Continuous Integration
 
-### 本地 CI 測試
+### Local CI Testing
 
 ```bash
 cd asr
 ./ci_test.sh
 ```
 
-這個腳本會：
-- 檢查環境和依賴
-- 執行所有測試（快速模式）
-- 產生測試報告
-- 適用於任何 CI/CD 系統
+This script will:
+- Check environment and dependencies
+- Run all tests (fast mode)
+- Generate test report
+- Suitable for any CI/CD system
 
 ### GitHub Actions
 
-專案包含 `.github/workflows/tests.yml` 配置檔案，會在以下情況自動執行測試：
-- Push 到 main 或 develop 分支
-- 建立 Pull Request
+Project includes `.github/workflows/tests.yml` configuration file, automatically runs tests when:
+- Push to main or develop branch
+- Create Pull Request
 
-需要在 GitHub repository settings 中設定 `HF_TOKEN` secret。
+Need to configure `HF_TOKEN` secret in GitHub repository settings.
 
-### 測試腳本說明
+### Test Script Descriptions
 
-| 腳本 | 用途 | 執行時間 |
-|------|------|---------|
-| `run_tests.sh` | 本地開發測試，支援多種選項 | 20-60秒 |
-| `ci_test.sh` | CI/CD 自動化測試，簡化輸出 | ~20秒 |
-| `.github/workflows/tests.yml` | GitHub Actions 配置 | ~20秒 |
+| Script | Purpose | Execution Time |
+|--------|---------|---------------|
+| `run_tests.sh` | Local development testing, supports multiple options | 20-60 seconds |
+| `ci_test.sh` | CI/CD automated testing, simplified output | ~20 seconds |
+| `.github/workflows/tests.yml` | GitHub Actions configuration | ~20 seconds |
 
-## 新增測試
+## Adding Tests
 
-### 測試檔案命名規範
-- `test_*.py` - 測試檔案
-- 放在 `tests/` 目錄下
-- 使用 `assert` 進行驗證
+### Test File Naming Convention
+- `test_*.py` - Test files
+- Place in `tests/` directory
+- Use `assert` for validation
 
-### 測試函式命名規範
+### Test Function Naming Convention
 ```python
 def test_feature_description():
-    """測試項目說明（會顯示在測試報告中）"""
-    # 測試邏輯
-    assert condition, "錯誤訊息"
+    """Test item description (will be displayed in test report)"""
+    # Test logic
+    assert condition, "Error message"
 ```
 
-### 更新測試覆蓋文件
-新增測試後請更新 [TEST_COVERAGE.md](./TEST_COVERAGE.md)。
+### Update Test Coverage Documentation
+After adding tests, please update [TEST_COVERAGE.md](./TEST_COVERAGE.md).
 
-## 已知限制
+## Known Limitations
 
-1. **視覺測試未完成** - GUI 自動化測試工具已建立但未整合（座標精度問題）
-2. **GUI Worker 未測試** - `asr_worker.py` 和 `summary_worker.py` 需要 Mock 測試
-3. **錯誤處理未覆蓋** - 異常情況測試不足
-4. **效能測試缺失** - 長音檔、大量段落的穩定性未驗證
+1. **Visual Testing Incomplete** - GUI automation testing tools built but not integrated (coordinate precision issues)
+2. **GUI Worker Not Tested** - `asr_worker.py` and `summary_worker.py` need Mock testing
+3. **Error Handling Not Covered** - Insufficient exception scenario testing
+4. **Performance Testing Missing** - Long audio, large segment count stability not verified
 
-詳見 [TEST_COVERAGE.md](./TEST_COVERAGE.md) 的「優先改善建議」章節。
+See "Priority Improvement Recommendations" section in [TEST_COVERAGE.md](./TEST_COVERAGE.md).
 
-## 問題回報
+## Issue Reporting
 
-測試失敗時請提供：
-1. 完整錯誤訊息
-2. 測試命令
-3. 環境資訊（Python 版本、OS、記憶體）
-4. 測試音檔資訊（如適用）
+When tests fail, please provide:
+1. Complete error message
+2. Test command
+3. Environment information (Python version, OS, memory)
+4. Test audio file information (if applicable)
