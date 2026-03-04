@@ -4,14 +4,15 @@ Realtime ASR Panel - UI for live microphone transcription.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QComboBox, QTextEdit, QProgressBar, QGroupBox, QFileDialog,
-    QMessageBox,
+    QMessageBox, QSplitter, QSpinBox, QCheckBox,
 )
-from PyQt6.QtCore import Qt, QDateTime
+from PyQt6.QtCore import Qt, QDateTime, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
 from pathlib import Path
 import os
 
 from core.realtime_worker import RealtimeASRWorker, ENGINE_WHISPER, ENGINE_QWEN3
+from core.live_summary_worker import LiveSummaryWorker
 
 
 class RealtimePanel(QWidget):
@@ -21,6 +22,14 @@ class RealtimePanel(QWidget):
         super().__init__(parent)
         self._worker = None
         self._session_texts = []
+        # Live summary state
+        self._summary_worker = None
+        self._summary_pending_texts = []  # texts not yet summarized
+        self._current_summary = ""
+        self._summary_timer = QTimer(self)
+        self._summary_timer.timeout.connect(self._trigger_summary)
+        self._summary_segment_threshold = 10  # trigger after N new segments
+        self._summary_interval_sec = 60       # or after T seconds
         self._init_ui()
 
     def _init_ui(self):
@@ -136,6 +145,9 @@ class RealtimePanel(QWidget):
 
         layout.addLayout(status_layout)
 
+        # --- Main content: Transcript (left) + Live Notes (right) ---
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
         # Transcript area
         transcript_group = QGroupBox("Live Transcript")
         transcript_layout = QVBoxLayout()
@@ -149,7 +161,64 @@ class RealtimePanel(QWidget):
         transcript_layout.addWidget(self.transcript_edit)
 
         transcript_group.setLayout(transcript_layout)
-        layout.addWidget(transcript_group, stretch=1)
+        splitter.addWidget(transcript_group)
+
+        # Live Notes area
+        notes_group = QGroupBox("Live Notes (Auto-Summary)")
+        notes_layout = QVBoxLayout()
+
+        # Summary settings row
+        summary_settings = QHBoxLayout()
+
+        self.summary_enabled = QCheckBox("Enable")
+        self.summary_enabled.setChecked(False)
+        self.summary_enabled.setToolTip("Auto-summarize transcript periodically via AWS Bedrock")
+        summary_settings.addWidget(self.summary_enabled)
+
+        summary_settings.addWidget(QLabel("Every"))
+        self.summary_segments_spin = QSpinBox()
+        self.summary_segments_spin.setRange(3, 50)
+        self.summary_segments_spin.setValue(10)
+        self.summary_segments_spin.setToolTip("Trigger summary after N new transcript segments")
+        summary_settings.addWidget(self.summary_segments_spin)
+        summary_settings.addWidget(QLabel("segments or"))
+
+        self.summary_interval_spin = QSpinBox()
+        self.summary_interval_spin.setRange(15, 300)
+        self.summary_interval_spin.setValue(60)
+        self.summary_interval_spin.setSuffix("s")
+        self.summary_interval_spin.setToolTip("Trigger summary after N seconds")
+        summary_settings.addWidget(self.summary_interval_spin)
+
+        self.summary_now_btn = QPushButton("📝 Summarize Now")
+        self.summary_now_btn.setToolTip("Trigger summary immediately")
+        self.summary_now_btn.clicked.connect(self._trigger_summary)
+        summary_settings.addWidget(self.summary_now_btn)
+
+        summary_settings.addStretch()
+        notes_layout.addLayout(summary_settings)
+
+        self.summary_status_label = QLabel("")
+        self.summary_status_label.setStyleSheet("color: #888; font-size: 11px;")
+        notes_layout.addWidget(self.summary_status_label)
+
+        self.summary_edit = QTextEdit()
+        self.summary_edit.setReadOnly(True)
+        self.summary_edit.setMinimumHeight(250)
+        self.summary_edit.setStyleSheet(
+            "QTextEdit { font-size: 13px; line-height: 1.5; padding: 10px; }"
+        )
+        self.summary_edit.setPlaceholderText(
+            "Live notes will appear here when auto-summary is enabled.\n"
+            "Requires AWS Bedrock access (Claude / Nova)."
+        )
+        notes_layout.addWidget(self.summary_edit)
+
+        notes_group.setLayout(notes_layout)
+        splitter.addWidget(notes_group)
+
+        splitter.setSizes([500, 400])
+        layout.addWidget(splitter, stretch=1)
 
     def _refresh_devices(self):
         self.device_combo.clear()
@@ -228,6 +297,11 @@ class RealtimePanel(QWidget):
         self.device_combo.setEnabled(False)
         self.engine_combo.setEnabled(False)
 
+        # Start summary timer if enabled
+        if self.summary_enabled.isChecked():
+            interval = self.summary_interval_spin.value() * 1000
+            self._summary_timer.start(interval)
+
     def _stop_recording(self):
         if self._worker:
             self._worker.stop()
@@ -235,6 +309,11 @@ class RealtimePanel(QWidget):
         self.status_label.setText("Stopping...")
 
     def _on_stopped(self):
+        self._summary_timer.stop()
+        # Final summary on stop if there are pending texts
+        if self.summary_enabled.isChecked() and self._summary_pending_texts:
+            self._trigger_summary()
+
         self.start_btn.setText("🎙 Start")
         self.start_btn.setStyleSheet(
             "QPushButton { background-color: #4CAF50; color: white; "
@@ -262,12 +341,18 @@ class RealtimePanel(QWidget):
 
     def _on_transcript(self, text):
         self._session_texts.append(text)
+        self._summary_pending_texts.append(text)
         timestamp = QDateTime.currentDateTime().toString("hh:mm:ss")
         self.transcript_edit.append(f"[{timestamp}] {text}")
         # Auto-scroll to bottom
         cursor = self.transcript_edit.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         self.transcript_edit.setTextCursor(cursor)
+        # Check if we should trigger summary by segment count
+        threshold = self.summary_segments_spin.value()
+        if (self.summary_enabled.isChecked()
+                and len(self._summary_pending_texts) >= threshold):
+            self._trigger_summary()
 
     def _on_status(self, msg):
         self.status_label.setText(msg)
@@ -280,9 +365,56 @@ class RealtimePanel(QWidget):
     def _on_level(self, level):
         self.level_bar.setValue(int(level * 100))
 
+    # ---- Live Summary ----
+
+    def _trigger_summary(self):
+        """Send pending transcript texts to Bedrock for summarization."""
+        if not self._summary_pending_texts:
+            return
+        # Don't stack concurrent summary calls
+        if self._summary_worker and self._summary_worker.isRunning():
+            return
+
+        texts = self._summary_pending_texts.copy()
+        self._summary_pending_texts.clear()
+
+        self._summary_worker = LiveSummaryWorker(
+            new_texts=texts,
+            previous_summary=self._current_summary,
+        )
+        self._summary_worker.summary_updated.connect(self._on_summary_updated)
+        self._summary_worker.status.connect(self._on_summary_status)
+        self._summary_worker.error.connect(self._on_summary_error)
+        self._summary_worker.start()
+
+        # Reset timer so next interval starts fresh
+        if self._summary_timer.isActive():
+            interval = self.summary_interval_spin.value() * 1000
+            self._summary_timer.start(interval)
+
+    def _on_summary_updated(self, summary):
+        self._current_summary = summary
+        self.summary_edit.setPlainText(summary)
+        # Scroll to top so user sees the latest structure
+        cursor = self.summary_edit.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        self.summary_edit.setTextCursor(cursor)
+
+    def _on_summary_status(self, msg):
+        self.summary_status_label.setText(msg)
+
+    def _on_summary_error(self, msg):
+        self.summary_status_label.setText(f"⚠ {msg}")
+
+    # ---- Transcript management ----
+
     def _clear_transcript(self):
         self.transcript_edit.clear()
         self._session_texts.clear()
+        self._summary_pending_texts.clear()
+        self._current_summary = ""
+        self.summary_edit.clear()
+        self.summary_status_label.setText("")
 
     def _save_transcript(self):
         if not self._session_texts:
@@ -304,7 +436,10 @@ class RealtimePanel(QWidget):
             QMessageBox.critical(self, "Error", f"Failed to save: {e}")
 
     def cleanup(self):
-        """Call on app exit to stop worker."""
+        """Call on app exit to stop workers."""
+        self._summary_timer.stop()
         if self._worker and self._worker.isRunning():
             self._worker.stop()
             self._worker.wait(3000)
+        if self._summary_worker and self._summary_worker.isRunning():
+            self._summary_worker.wait(3000)
