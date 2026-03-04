@@ -236,6 +236,10 @@ class RealtimeASRWorker(QThread):
             )
             return None
 
+        # Suppress repetitive "Setting pad_token_id to eos_token_id" warnings
+        import logging
+        logging.getLogger("transformers").setLevel(logging.ERROR)
+
         self.status_changed.emit("Loading Qwen3-ASR model (first load downloads ~3.5 GB)...")
 
         # Pick model variant based on model_size hint
