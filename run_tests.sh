@@ -58,6 +58,7 @@ while [[ $# -gt 0 ]]; do
             echo "  error           錯誤處理測試"
             echo "  s2t             Qwen3-ASR 簡繁轉換測試 (unit)"
             echo "  live_summary    Live Summary 測試 (unit)"
+            echo "  speaker_map     Speaker Name Mapping 測試 (unit)"
             echo "  realtime_unit   所有 realtime 相關 unit tests"
             echo ""
             echo "範例:"
@@ -160,7 +161,8 @@ get_test_file() {
         error) echo "$TEST_error" ;;
         s2t) echo "PYTEST:test_qwen3_s2t.py -k unit" ;;
         live_summary) echo "PYTEST:test_live_summary.py" ;;
-        realtime_unit) echo "PYTEST:test_qwen3_s2t.py -k unit test_live_summary.py" ;;
+        speaker_map) echo "PYTEST:test_speaker_mapping.py" ;;
+        realtime_unit) echo "PYTEST:test_qwen3_s2t.py -k unit test_live_summary.py test_speaker_mapping.py" ;;
         *) echo "" ;;
     esac
 }
@@ -206,6 +208,7 @@ else
     # 6. Realtime unit tests (pytest-based)
     run_test "Qwen3-ASR 簡繁轉換 (unit)" "PYTEST:test_qwen3_s2t.py -k unit" ""
     run_test "Live Summary (unit)" "PYTEST:test_live_summary.py" ""
+    run_test "Speaker Mapping (unit)" "PYTEST:test_speaker_mapping.py" ""
 fi
 
 # 顯示總結

@@ -195,6 +195,11 @@ class RealtimePanel(QWidget):
         self.summary_now_btn.clicked.connect(self._trigger_summary)
         summary_settings.addWidget(self.summary_now_btn)
 
+        self.save_notes_btn = QPushButton("💾 Save Notes")
+        self.save_notes_btn.setToolTip("Save current live notes to file")
+        self.save_notes_btn.clicked.connect(self._save_notes)
+        summary_settings.addWidget(self.save_notes_btn)
+
         summary_settings.addStretch()
         notes_layout.addLayout(summary_settings)
 
@@ -432,6 +437,28 @@ class RealtimePanel(QWidget):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(self.transcript_edit.toPlainText())
             QMessageBox.information(self, "Saved", f"Transcript saved to:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save: {e}")
+
+    def _save_notes(self):
+        """Save live notes / summary to a markdown file."""
+        text = self.summary_edit.toPlainText().strip()
+        if not text:
+            QMessageBox.information(self, "Save", "No notes to save.")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Notes",
+            str(Path.home() / "realtime_notes.md"),
+            "Markdown (*.md);;Text Files (*.txt);;All Files (*)",
+        )
+        if not path:
+            return
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            QMessageBox.information(self, "Saved", f"Notes saved to:\n{path}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save: {e}")
 

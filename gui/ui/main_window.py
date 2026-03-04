@@ -6,7 +6,8 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QComboBox, QCheckBox, QListWidget,
     QProgressBar, QFileDialog, QGroupBox, QMessageBox,
     QScrollArea, QLineEdit, QListWidgetItem, QSlider,
-    QTextEdit, QSplitter, QTabWidget
+    QTextEdit, QSplitter, QTabWidget, QDialog, QFormLayout,
+    QDialogButtonBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QColor
@@ -351,6 +352,19 @@ class MainWindow(QMainWindow):
         
         # 儲存按鈕列
         save_layout = QHBoxLayout()
+
+        # Speaker name mapping
+        self.speaker_map_btn = QPushButton("👤 Speaker Names")
+        self.speaker_map_btn.setToolTip("Assign names to speakers (e.g., SPEAKER_00 → Manager Wang)")
+        self.speaker_map_btn.clicked.connect(self._show_speaker_mapping)
+        self.speaker_map_btn.setEnabled(False)
+        self.speaker_map_btn.setStyleSheet("""
+            QPushButton { background-color: #3498db; color: white; font-weight: bold; border-radius: 4px; padding: 6px 16px; }
+            QPushButton:hover { background-color: #2980b9; }
+            QPushButton:disabled { background-color: #ccc; }
+        """)
+        save_layout.addWidget(self.speaker_map_btn)
+
         self.save_srt_btn = QPushButton("💾 儲存修改")
         self.save_srt_btn.clicked.connect(self._save_srt)
         self.save_srt_btn.setEnabled(False)
@@ -817,6 +831,7 @@ class MainWindow(QMainWindow):
 
         if self.srt_segments:
             self.result_group.setVisible(True)
+            self.speaker_map_btn.setEnabled(True)
             # 避免重複 connect
             try:
                 self.player.durationChanged.disconnect(self._on_duration_changed)
@@ -948,6 +963,100 @@ class MainWindow(QMainWindow):
         for seg in self.srt_segments:
             lines.append(seg['text'])
         return '\n'.join(lines)
+
+    # ---- Speaker Name Mapping ----
+
+    def _show_speaker_mapping(self):
+        """Show dialog to map SPEAKER_XX labels to real names."""
+        if not self.srt_segments:
+            return
+
+        # Extract unique speaker labels
+        speaker_pattern = re.compile(r'\[SPEAKER_\d+\]')
+        speakers = set()
+        for seg in self.srt_segments:
+            matches = speaker_pattern.findall(seg['text'])
+            speakers.update(matches)
+
+        if not speakers:
+            QMessageBox.information(
+                self, "Speaker Mapping",
+                "No speaker labels found in transcription.\n"
+                "(Speaker labels look like [SPEAKER_00])"
+            )
+            return
+
+        speakers = sorted(speakers)
+
+        # Build dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Speaker Name Mapping")
+        dialog.setMinimumWidth(400)
+        dlg_layout = QVBoxLayout(dialog)
+
+        hint = QLabel("Assign names to each speaker. Leave blank to keep original label.")
+        hint.setStyleSheet("color: #666; margin-bottom: 8px;")
+        hint.setWordWrap(True)
+        dlg_layout.addWidget(hint)
+
+        form = QFormLayout()
+        name_inputs = {}
+        for spk in speakers:
+            inp = QLineEdit()
+            inp.setPlaceholderText(f"e.g. Manager Wang")
+            name_inputs[spk] = inp
+            form.addRow(f"{spk} →", inp)
+        dlg_layout.addLayout(form)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        dlg_layout.addWidget(buttons)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        # Build mapping (skip empty)
+        mapping = {}
+        for spk, inp in name_inputs.items():
+            name = inp.text().strip()
+            if name:
+                mapping[spk] = f"[{name}]"
+
+        if not mapping:
+            return
+
+        self._apply_speaker_mapping(mapping)
+
+    def _apply_speaker_mapping(self, mapping: dict):
+        """Replace speaker labels in segments and refresh subtitle list."""
+        changed = 0
+        for seg in self.srt_segments:
+            original = seg['text']
+            new_text = original
+            for old_label, new_label in mapping.items():
+                new_text = new_text.replace(old_label, new_label)
+            if new_text != original:
+                seg['text'] = new_text
+                changed += 1
+
+        # Refresh subtitle list display
+        self.subtitle_list.blockSignals(True)
+        for i, seg in enumerate(self.srt_segments):
+            start_str = self._ms_to_time_str(seg['start_ms'])
+            item = self.subtitle_list.item(i)
+            if item:
+                item.setText(f"[{start_str}] {seg['text']}")
+        self.subtitle_list.blockSignals(False)
+
+        if changed:
+            self.save_srt_btn.setEnabled(True)
+            self.edit_hint_label.setText(f"✎ Renamed speakers in {changed} segments — click Save to apply")
+            self.edit_hint_label.setStyleSheet("color: #e67e22; font-size: 11px; font-weight: bold;")
+            self.log_list.addItem(f"👤 Speaker mapping applied: {', '.join(f'{k}→{v}' for k, v in mapping.items())}")
+            self.log_list.scrollToBottom()
     
     def _generate_summary(self):
         """產生會議摘要"""
