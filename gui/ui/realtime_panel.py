@@ -11,7 +11,7 @@ from PyQt6.QtGui import QFont, QTextCursor
 from pathlib import Path
 import os
 
-from core.realtime_worker import RealtimeASRWorker
+from core.realtime_worker import RealtimeASRWorker, ENGINE_WHISPER, ENGINE_QWEN3
 
 
 class RealtimePanel(QWidget):
@@ -53,13 +53,17 @@ class RealtimePanel(QWidget):
         settings_layout.addWidget(self.language_combo)
 
         settings_layout.addSpacing(15)
+        settings_layout.addWidget(QLabel("Engine:"))
+        self.engine_combo = QComboBox()
+        self.engine_combo.addItem("MLX Whisper", ENGINE_WHISPER)
+        self.engine_combo.addItem("Qwen3-ASR", ENGINE_QWEN3)
+        self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
+        settings_layout.addWidget(self.engine_combo)
+
+        settings_layout.addSpacing(15)
         settings_layout.addWidget(QLabel("Model:"))
         self.model_combo = QComboBox()
-        self.model_combo.addItems([
-            "tiny (~1-2 GB)", "base (~2-3 GB)",
-            "small (~3-4 GB)", "medium (~5-7 GB)",
-        ])
-        self.model_combo.setCurrentIndex(1)  # base for low latency
+        self._update_model_options()
         settings_layout.addWidget(self.model_combo)
 
         settings_layout.addSpacing(15)
@@ -160,10 +164,37 @@ class RealtimePanel(QWidget):
 
     def _get_model(self):
         text = self.model_combo.currentText()
+        engine = self.engine_combo.currentData()
+        if engine == ENGINE_QWEN3:
+            # Map UI label to a model_size hint the worker understands
+            # "small" -> worker picks 0.6B, anything else -> 1.7B
+            return "small" if "0.6B" in text else "large"
         return text.split(" ")[0]
 
     def _get_device_index(self):
         return self.device_combo.currentData()
+
+    def _get_engine(self):
+        return self.engine_combo.currentData()
+
+    def _on_engine_changed(self, index):
+        self._update_model_options()
+
+    def _update_model_options(self):
+        engine = self.engine_combo.currentData()
+        self.model_combo.clear()
+        if engine == ENGINE_QWEN3:
+            self.model_combo.addItems([
+                "small (0.6B ~1.5 GB)",
+                "large (1.7B ~3.5 GB)",
+            ])
+            self.model_combo.setCurrentIndex(0)
+        else:
+            self.model_combo.addItems([
+                "tiny (~1-2 GB)", "base (~2-3 GB)",
+                "small (~3-4 GB)", "medium (~5-7 GB)",
+            ])
+            self.model_combo.setCurrentIndex(1)
 
     def _toggle_recording(self):
         if self._worker and self._worker.isRunning():
@@ -176,6 +207,7 @@ class RealtimePanel(QWidget):
             language=self._get_language(),
             model_size=self._get_model(),
             device_index=self._get_device_index(),
+            engine=self._get_engine(),
         )
         self._worker.transcript_update.connect(self._on_transcript)
         self._worker.status_changed.connect(self._on_status)
@@ -194,6 +226,7 @@ class RealtimePanel(QWidget):
         self.language_combo.setEnabled(False)
         self.model_combo.setEnabled(False)
         self.device_combo.setEnabled(False)
+        self.engine_combo.setEnabled(False)
 
     def _stop_recording(self):
         if self._worker:
@@ -214,6 +247,7 @@ class RealtimePanel(QWidget):
         self.language_combo.setEnabled(True)
         self.model_combo.setEnabled(True)
         self.device_combo.setEnabled(True)
+        self.engine_combo.setEnabled(True)
         self.level_bar.setValue(0)
 
     def _toggle_pause(self):
