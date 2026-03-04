@@ -272,6 +272,15 @@ class RealtimeASRWorker(QThread):
 
         lang_name = QWEN3_LANG_MAP.get(self.language)
 
+        # Simplified → Traditional Chinese converter (optional)
+        s2t_converter = None
+        if self.language in ("zh", "auto"):
+            try:
+                from opencc import OpenCC
+                s2t_converter = OpenCC("s2t")
+            except ImportError:
+                pass  # opencc not installed, output stays simplified
+
         def transcribe_fn(wav_path, chunk_array):
             # Qwen3-ASR accepts (np.ndarray, sample_rate) tuple
             results = model.transcribe(
@@ -279,7 +288,10 @@ class RealtimeASRWorker(QThread):
                 language=[lang_name] if lang_name else None,
             )
             if results and results[0].text:
-                return results[0].text.strip()
+                text = results[0].text.strip()
+                if s2t_converter and text:
+                    text = s2t_converter.convert(text)
+                return text
             return ""
 
         return transcribe_fn

@@ -22,6 +22,7 @@ realtime = [
     "PyQt6>=6.0.0",
     "sounddevice>=0.4.0",
     "qwen-asr>=0.1.0",
+    "opencc-python-reimplemented>=0.1.7",
 ]
 aws = [
     "boto3>=1.26.0",
@@ -35,6 +36,7 @@ all = [
     "pytest>=7.0.0",
     "sounddevice>=0.4.0",
     "qwen-asr>=0.1.0",
+    "opencc-python-reimplemented>=0.1.7",
 ]
 
 [build-system]
