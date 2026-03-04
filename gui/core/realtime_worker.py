@@ -18,7 +18,7 @@ SAMPLE_RATE = 16000
 CHANNELS = 1
 MIN_CHUNK_DURATION = 3    # minimum seconds before considering transcription
 MAX_CHUNK_DURATION = 10   # force transcribe after this many seconds
-SILENCE_SPLIT_DURATION = 0.6  # seconds of silence at tail to trigger split
+SILENCE_SPLIT_DURATION = 0.4  # seconds of silence at tail to trigger split
 SILENCE_THRESHOLD = 0.01  # RMS threshold for silence detection
 
 # Engine constants
