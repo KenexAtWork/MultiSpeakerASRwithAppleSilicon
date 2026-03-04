@@ -45,3 +45,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["gui"]  # 只打包 gui 目錄作為套件
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: fast tests that don't need models or hardware",
+    "integration: tests that need models, audio files, or AWS access",
+]

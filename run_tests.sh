@@ -56,6 +56,9 @@ while [[ $# -gt 0 ]]; do
             echo "  gui_media       GUI 媒體播放器測試"
             echo "  srt_parser      SRT 解析測試"
             echo "  error           錯誤處理測試"
+            echo "  s2t             Qwen3-ASR 簡繁轉換測試 (unit)"
+            echo "  live_summary    Live Summary 測試 (unit)"
+            echo "  realtime_unit   所有 realtime 相關 unit tests"
             echo ""
             echo "範例:"
             echo "  $0                    # 執行所有測試"
@@ -93,22 +96,46 @@ run_test() {
     
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     
-    if $VERBOSE; then
-        if $PYTHON "tests/$test_file" $test_args; then
-            echo -e "${GREEN}✓ $test_name 通過${NC}"
-            PASSED_TESTS=$((PASSED_TESTS + 1))
+    # Check if this is a pytest-based test
+    if [[ "$test_file" == PYTEST:* ]]; then
+        local pytest_args="${test_file#PYTEST:}"
+        local cmd="$PYTHON -m pytest tests/$pytest_args -v"
+        if $VERBOSE; then
+            if eval $cmd; then
+                echo -e "${GREEN}✓ $test_name 通過${NC}"
+                PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+                echo -e "${RED}✗ $test_name 失敗${NC}"
+                FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
         else
-            echo -e "${RED}✗ $test_name 失敗${NC}"
-            FAILED_TESTS=$((FAILED_TESTS + 1))
+            if output=$(eval $cmd 2>&1); then
+                echo -e "${GREEN}✓ $test_name 通過${NC}"
+                PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+                echo -e "${RED}✗ $test_name 失敗${NC}"
+                echo "$output"
+                FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
         fi
     else
-        if output=$($PYTHON "tests/$test_file" $test_args 2>&1); then
-            echo -e "${GREEN}✓ $test_name 通過${NC}"
-            PASSED_TESTS=$((PASSED_TESTS + 1))
+        if $VERBOSE; then
+            if $PYTHON "tests/$test_file" $test_args; then
+                echo -e "${GREEN}✓ $test_name 通過${NC}"
+                PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+                echo -e "${RED}✗ $test_name 失敗${NC}"
+                FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
         else
-            echo -e "${RED}✗ $test_name 失敗${NC}"
-            echo "$output"
-            FAILED_TESTS=$((FAILED_TESTS + 1))
+            if output=$($PYTHON "tests/$test_file" $test_args 2>&1); then
+                echo -e "${GREEN}✓ $test_name 通過${NC}"
+                PASSED_TESTS=$((PASSED_TESTS + 1))
+            else
+                echo -e "${RED}✗ $test_name 失敗${NC}"
+                echo "$output"
+                FAILED_TESTS=$((FAILED_TESTS + 1))
+            fi
         fi
     fi
     
@@ -131,6 +158,9 @@ get_test_file() {
         gui_media) echo "$TEST_gui_media" ;;
         srt_parser) echo "$TEST_srt_parser" ;;
         error) echo "$TEST_error" ;;
+        s2t) echo "PYTEST:test_qwen3_s2t.py -k unit" ;;
+        live_summary) echo "PYTEST:test_live_summary.py" ;;
+        realtime_unit) echo "PYTEST:test_qwen3_s2t.py -k unit test_live_summary.py" ;;
         *) echo "" ;;
     esac
 }
@@ -172,6 +202,10 @@ else
     
     # 5. 錯誤處理測試
     run_test "錯誤處理" "$TEST_error" ""
+    
+    # 6. Realtime unit tests (pytest-based)
+    run_test "Qwen3-ASR 簡繁轉換 (unit)" "PYTEST:test_qwen3_s2t.py -k unit" ""
+    run_test "Live Summary (unit)" "PYTEST:test_live_summary.py" ""
 fi
 
 # 顯示總結
