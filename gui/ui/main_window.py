@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QComboBox, QCheckBox, QListWidget,
     QProgressBar, QFileDialog, QGroupBox, QMessageBox,
     QScrollArea, QLineEdit, QListWidgetItem, QSlider,
-    QTextEdit, QSplitter
+    QTextEdit, QSplitter, QTabWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QUrl
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QColor
@@ -18,6 +18,7 @@ import boto3
 
 from core.asr_worker import ASRWorker
 from core.summary_worker import SummaryWorker, DEFAULT_PROMPT
+from ui.realtime_panel import RealtimePanel
 
 
 class DropZone(QLabel):
@@ -116,11 +117,18 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ASR Multi-Speaker Transcription")
         self.setMinimumSize(800, 700)
         
-        # 主要 widget — 用 QScrollArea 包裝，視窗縮小時可捲動
+        # Tab widget as central widget
+        self.tabs = QTabWidget()
+        self.setCentralWidget(self.tabs)
+        
+        # --- Tab 1: File Transcription (existing UI) ---
+        file_tab = QWidget()
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
-        self.setCentralWidget(scroll_area)
+        file_tab_layout = QVBoxLayout(file_tab)
+        file_tab_layout.setContentsMargins(0, 0, 0, 0)
+        file_tab_layout.addWidget(scroll_area)
         
         content_widget = QWidget()
         scroll_area.setWidget(content_widget)
@@ -479,6 +487,13 @@ class MainWindow(QMainWindow):
         
         # 載入上次的 ASR 設定
         self._load_asr_settings()
+        
+        # Register tabs
+        self.tabs.addTab(file_tab, "📁 File Transcription")
+        
+        # --- Tab 2: Realtime ASR ---
+        self.realtime_panel = RealtimePanel()
+        self.tabs.addTab(self.realtime_panel, "🎙 Realtime ASR")
     
     def _toggle_token_visibility(self):
         """切換 token 顯示/隱藏"""
@@ -1127,3 +1142,9 @@ class MainWindow(QMainWindow):
         for name, pid in fallback:
             self.bedrock_model_combo.addItem(name, pid)
 
+
+    def closeEvent(self, event):
+        """Clean up realtime worker on window close."""
+        if hasattr(self, 'realtime_panel'):
+            self.realtime_panel.cleanup()
+        event.accept()
