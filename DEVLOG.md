@@ -11,15 +11,14 @@
 - Suppressed `pad_token_id` console warning spam (transformers logger → ERROR)
 - Reduced `SILENCE_SPLIT_DURATION` from 0.6s to 0.4s for faster response feel
 - Added opencc simplified→traditional Chinese auto-conversion for Qwen3-ASR output
+- Added test suite `tests/test_qwen3_s2t.py`:
+  - 5 unit tests (opencc logic, no model needed) — all passing
+  - 3 integration tests (Qwen3-ASR + sample-01.mp4 + s2t verification) — pending execution
 
 ### Pending / Not Yet Tested
-- **opencc s2t conversion**: Code added but not yet tested on device. Need to:
-  1. Install `opencc-python-reimplemented`
-  2. Run realtime ASR with Qwen3-ASR engine and verify output is traditional Chinese
-- **Automated test for s2t conversion**: User wants an automated test. Plan:
-  - User will provide a test audio file (Chinese speech)
-  - Build a test that runs Qwen3-ASR on the audio, checks output contains traditional Chinese characters
-  - Could also unit-test the opencc conversion in isolation (no model needed)
+- **opencc s2t conversion**: Code added, unit tests pass, but not yet tested live on device
+  - Need to install `opencc-python-reimplemented` and run realtime ASR to verify
+  - Integration tests written (`tests/test_qwen3_s2t.py -k integration`) but not yet executed (requires model load)
 
 ### Known Behaviors
 - Qwen3-ASR natively outputs simplified Chinese — opencc `s2t` converter handles conversion
