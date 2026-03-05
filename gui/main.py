@@ -5,7 +5,13 @@ ASR Multi-Speaker Transcription - GUI Application
 """
 import sys
 import os
+import logging
 from pathlib import Path
+
+# Suppress noisy AWS/botocore credential logs
+logging.getLogger("botocore").setLevel(logging.WARNING)
+logging.getLogger("boto3").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # 將父目錄加入 Python 路徑，以便導入 asr_multi_speaker_v5_fast
 sys.path.insert(0, str(Path(__file__).parent.parent))
