@@ -13,6 +13,7 @@ import os
 
 from core.realtime_worker import RealtimeASRWorker, ENGINE_WHISPER, ENGINE_QWEN3
 from core.live_summary_worker import LiveSummaryWorker
+from core.refinement_worker import IncrementalRefinementWorker, PostRecordingRefinementWorker
 
 
 class RealtimePanel(QWidget):
@@ -36,6 +37,10 @@ class RealtimePanel(QWidget):
         self._summary_timer.timeout.connect(self._trigger_summary)
         self._summary_segment_threshold = 10  # trigger after N new segments
         self._summary_interval_sec = 60       # or after T seconds
+        # Refinement state
+        self._incremental_worker = None
+        self._post_worker = None
+        self._refined_segments = []  # list of dicts from post-recording refinement
         self._init_ui()
         # Start mic preview immediately
         self._start_mic_preview()
@@ -99,6 +104,36 @@ class RealtimePanel(QWidget):
         settings_layout.addStretch()
         settings.setLayout(settings_layout)
         layout.addWidget(settings)
+
+        # Refinement settings
+        refine_group = QGroupBox("Background Refinement (Dual-Pass ASR)")
+        refine_layout = QHBoxLayout()
+
+        self.refine_incremental_cb = QCheckBox("Incremental (while recording)")
+        self.refine_incremental_cb.setToolTip(
+            "Re-transcribe audio segments with a larger model in background while recording"
+        )
+        refine_layout.addWidget(self.refine_incremental_cb)
+
+        self.refine_post_cb = QCheckBox("Post-recording")
+        self.refine_post_cb.setChecked(True)
+        self.refine_post_cb.setToolTip(
+            "Re-transcribe full recording with a larger model after stopping"
+        )
+        refine_layout.addWidget(self.refine_post_cb)
+
+        refine_layout.addSpacing(10)
+        refine_layout.addWidget(QLabel("Refine model:"))
+        self.refine_model_combo = QComboBox()
+        self.refine_model_combo.addItems([
+            "medium (~5-7 GB)", "small (~3-4 GB)", "large (~8-10 GB)",
+        ])
+        self.refine_model_combo.setToolTip("Model used for background refinement")
+        refine_layout.addWidget(self.refine_model_combo)
+
+        refine_layout.addStretch()
+        refine_group.setLayout(refine_layout)
+        layout.addWidget(refine_group)
 
         # Controls
         ctrl_layout = QHBoxLayout()
@@ -233,6 +268,46 @@ class RealtimePanel(QWidget):
 
         splitter.setSizes([500, 400])
         layout.addWidget(splitter, stretch=1)
+
+        # --- Refinement results area ---
+        self.refine_group = QGroupBox("🔄 Refined Transcript (Background ASR)")
+        self.refine_group.setVisible(False)
+        refine_result_layout = QVBoxLayout()
+
+        refine_status_row = QHBoxLayout()
+        self.refine_status_label = QLabel("")
+        self.refine_status_label.setStyleSheet("color: #2196F3; font-weight: bold;")
+        refine_status_row.addWidget(self.refine_status_label)
+        refine_status_row.addStretch()
+
+        self.refine_progress = QProgressBar()
+        self.refine_progress.setRange(0, 100)
+        self.refine_progress.setValue(0)
+        self.refine_progress.setFixedWidth(200)
+        self.refine_progress.setVisible(False)
+        refine_status_row.addWidget(self.refine_progress)
+
+        self.refine_save_btn = QPushButton("💾 Save Refined")
+        self.refine_save_btn.clicked.connect(self._save_refined_transcript)
+        self.refine_save_btn.setEnabled(False)
+        refine_status_row.addWidget(self.refine_save_btn)
+
+        refine_result_layout.addLayout(refine_status_row)
+
+        self.refine_edit = QTextEdit()
+        self.refine_edit.setReadOnly(True)
+        self.refine_edit.setMaximumHeight(200)
+        self.refine_edit.setStyleSheet(
+            "QTextEdit { font-size: 13px; line-height: 1.5; padding: 10px; "
+            "background-color: #f0f8ff; }"
+        )
+        self.refine_edit.setPlaceholderText(
+            "Refined transcript will appear here after background ASR completes."
+        )
+        refine_result_layout.addWidget(self.refine_edit)
+
+        self.refine_group.setLayout(refine_result_layout)
+        layout.addWidget(self.refine_group)
 
     def _refresh_devices(self):
         self.device_combo.clear()
@@ -382,6 +457,31 @@ class RealtimePanel(QWidget):
             interval = self.summary_interval_spin.value() * 1000
             self._summary_timer.start(interval)
 
+        # Start incremental refinement if enabled
+        if self.refine_incremental_cb.isChecked():
+            refine_model = self.refine_model_combo.currentText().split(" ")[0]
+            self._incremental_worker = IncrementalRefinementWorker(
+                engine=self._get_engine(),
+                model_size=refine_model,
+                language=self._get_language(),
+                segment_duration=30,
+            )
+            self._incremental_worker.segment_refined.connect(self._on_incremental_refined)
+            self._incremental_worker.status.connect(self._on_refine_status)
+            self._incremental_worker.error.connect(self._on_refine_error)
+            self._worker.raw_chunk.connect(self._feed_incremental_chunk)
+            self._incremental_worker.start()
+            self.refine_group.setVisible(True)
+            self.refine_edit.clear()
+            self.refine_status_label.setText("⏳ Incremental refinement starting...")
+
+        # Connect raw_chunk for post-recording (always, to accumulate audio)
+        if self.refine_post_cb.isChecked() or self.refine_incremental_cb.isChecked():
+            if not self.refine_incremental_cb.isChecked():
+                # Need a lightweight accumulator if only post-recording is enabled
+                self._raw_audio_chunks = []
+                self._worker.raw_chunk.connect(self._accumulate_raw_chunk)
+
     def _stop_recording(self):
         if self._worker:
             self._worker.stop()
@@ -393,6 +493,15 @@ class RealtimePanel(QWidget):
         # Final summary on stop if there are pending texts
         if self.summary_enabled.isChecked() and self._summary_pending_texts:
             self._trigger_summary()
+
+        # Stop incremental refinement
+        if self._incremental_worker and self._incremental_worker.isRunning():
+            self._incremental_worker.stop()
+            self._incremental_worker.wait(3000)
+
+        # Trigger post-recording refinement
+        if self.refine_post_cb.isChecked():
+            self._start_post_refinement()
 
         self.start_btn.setText("🎙 Start")
         self.start_btn.setStyleSheet(
@@ -498,6 +607,141 @@ class RealtimePanel(QWidget):
     def _on_summary_error(self, msg):
         self.summary_status_label.setText(f"⚠ {msg}")
 
+    # ---- Refinement (Dual-Pass ASR) ----
+
+    def _feed_incremental_chunk(self, audio, timestamp):
+        """Feed raw audio chunk to incremental refinement worker."""
+        if self._incremental_worker and self._incremental_worker.isRunning():
+            import numpy as np
+            if isinstance(audio, np.ndarray):
+                self._incremental_worker.add_chunk(audio, timestamp)
+
+    def _accumulate_raw_chunk(self, audio, timestamp):
+        """Accumulate raw audio for post-recording refinement only."""
+        import numpy as np
+        if isinstance(audio, np.ndarray):
+            if not hasattr(self, '_raw_audio_chunks'):
+                self._raw_audio_chunks = []
+            self._raw_audio_chunks.append(audio.copy())
+
+    def _on_incremental_refined(self, seg_index, text, start_sec, end_sec):
+        """Handle a refined segment from incremental worker."""
+        self.refine_group.setVisible(True)
+        start_str = f"{int(start_sec//60):02d}:{int(start_sec%60):02d}"
+        end_str = f"{int(end_sec//60):02d}:{int(end_sec%60):02d}"
+        self.refine_edit.append(f"[{start_str}-{end_str}] {text}")
+        cursor = self.refine_edit.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.refine_edit.setTextCursor(cursor)
+        self.refine_save_btn.setEnabled(True)
+
+    def _start_post_refinement(self):
+        """Start post-recording refinement with full audio."""
+        import numpy as np
+
+        # Get full audio from incremental worker or raw chunks
+        full_audio = None
+        if self._incremental_worker:
+            full_audio = self._incremental_worker.get_full_audio()
+        elif hasattr(self, '_raw_audio_chunks') and self._raw_audio_chunks:
+            full_audio = np.concatenate(self._raw_audio_chunks)
+            self._raw_audio_chunks = []
+
+        if full_audio is None or len(full_audio) < 16000:
+            return  # too short, skip
+
+        refine_model = self.refine_model_combo.currentText().split(" ")[0]
+        self._post_worker = PostRecordingRefinementWorker(
+            audio=full_audio,
+            engine=self._get_engine(),
+            model_size=refine_model,
+            language=self._get_language(),
+        )
+        self._post_worker.refinement_complete.connect(self._on_post_refinement_done)
+        self._post_worker.progress.connect(self._on_refine_progress)
+        self._post_worker.status.connect(self._on_refine_status)
+        self._post_worker.error.connect(self._on_refine_error)
+        self._post_worker.start()
+
+        self.refine_group.setVisible(True)
+        self.refine_progress.setVisible(True)
+        self.refine_progress.setValue(0)
+        self.refine_status_label.setText("⏳ Post-recording refinement in progress...")
+
+    def _on_post_refinement_done(self, segments):
+        """Handle completed post-recording refinement."""
+        self._refined_segments = segments
+        self.refine_edit.clear()
+        for seg in segments:
+            start = seg["start_sec"]
+            end = seg["end_sec"]
+            start_str = f"{int(start//60):02d}:{int(start%60):02d}"
+            end_str = f"{int(end//60):02d}:{int(end%60):02d}"
+            self.refine_edit.append(f"[{start_str}-{end_str}] {seg['text']}")
+        self.refine_progress.setVisible(False)
+        self.refine_save_btn.setEnabled(True)
+        self.refine_status_label.setText("✅ Refinement complete")
+
+    def _on_refine_status(self, msg):
+        self.refine_status_label.setText(msg)
+
+    def _on_refine_progress(self, value):
+        self.refine_progress.setValue(value)
+
+    def _on_refine_error(self, msg):
+        self.refine_status_label.setText(f"⚠ {msg}")
+        self.refine_progress.setVisible(False)
+
+    def _save_refined_transcript(self):
+        """Save refined transcript to file."""
+        text = self.refine_edit.toPlainText().strip()
+        if not text:
+            QMessageBox.information(self, "Save", "No refined transcript to save.")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Refined Transcript",
+            str(Path.home() / "refined_transcript.txt"),
+            "Text Files (*.txt);;SRT Files (*.srt);;All Files (*)",
+        )
+        if not path:
+            return
+
+        try:
+            if path.endswith(".srt"):
+                self._save_refined_as_srt(path)
+            else:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+            QMessageBox.information(self, "Saved", f"Refined transcript saved to:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save: {e}")
+
+    def _save_refined_as_srt(self, path):
+        """Save refined segments as SRT format."""
+        segments = self._refined_segments
+        if not segments:
+            # Fallback: save plain text
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.refine_edit.toPlainText())
+            return
+
+        with open(path, "w", encoding="utf-8") as f:
+            for i, seg in enumerate(segments, 1):
+                start = seg["start_sec"]
+                end = seg["end_sec"]
+                start_srt = self._sec_to_srt_time(start)
+                end_srt = self._sec_to_srt_time(end)
+                f.write(f"{i}\n{start_srt} --> {end_srt}\n{seg['text']}\n\n")
+
+    @staticmethod
+    def _sec_to_srt_time(sec):
+        h = int(sec // 3600)
+        m = int((sec % 3600) // 60)
+        s = int(sec % 60)
+        ms = int((sec - int(sec)) * 1000)
+        return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
     # ---- Transcript management ----
 
     def _clear_transcript(self):
@@ -507,6 +751,12 @@ class RealtimePanel(QWidget):
         self._current_summary = ""
         self.summary_edit.clear()
         self.summary_status_label.setText("")
+        # Clear refinement
+        self.refine_edit.clear()
+        self._refined_segments = []
+        self.refine_group.setVisible(False)
+        self.refine_save_btn.setEnabled(False)
+        self.refine_status_label.setText("")
 
     def _save_transcript(self):
         if not self._session_texts:
@@ -558,3 +808,8 @@ class RealtimePanel(QWidget):
             self._worker.wait(3000)
         if self._summary_worker and self._summary_worker.isRunning():
             self._summary_worker.wait(3000)
+        if self._incremental_worker and self._incremental_worker.isRunning():
+            self._incremental_worker.stop()
+            self._incremental_worker.wait(3000)
+        if self._post_worker and self._post_worker.isRunning():
+            self._post_worker.wait(5000)

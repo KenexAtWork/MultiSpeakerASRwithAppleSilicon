@@ -43,6 +43,7 @@ class RealtimeASRWorker(QThread):
     status_changed = pyqtSignal(str)     # status message
     error = pyqtSignal(str)
     level_update = pyqtSignal(float)     # audio level 0.0-1.0 for VU meter
+    raw_chunk = pyqtSignal(object, float)  # (np.ndarray, timestamp_sec) for refinement
     stopped = pyqtSignal()
 
     def __init__(self, language="auto", model_size="base",
@@ -97,6 +98,7 @@ class RealtimeASRWorker(QThread):
         self.status_changed.emit("Listening...")
 
         # --- Audio capture loop ---
+        _start_time = time.time()
         audio_buffer = np.array([], dtype=np.float32)
         min_chunk_samples = int(MIN_CHUNK_DURATION * SAMPLE_RATE)
         max_chunk_samples = int(MAX_CHUNK_DURATION * SAMPLE_RATE)
@@ -163,6 +165,10 @@ class RealtimeASRWorker(QThread):
                 rms = float(np.sqrt(np.mean(chunk ** 2)))
                 if rms < SILENCE_THRESHOLD:
                     continue
+
+                # Emit raw chunk for refinement worker (before transcription)
+                chunk_time = time.time() - _start_time
+                self.raw_chunk.emit(chunk, chunk_time)
 
                 # Transcribe using selected engine
                 self._save_wav(tmp_path, chunk)

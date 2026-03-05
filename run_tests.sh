@@ -60,6 +60,7 @@ while [[ $# -gt 0 ]]; do
             echo "  live_summary    Live Summary 測試 (unit)"
             echo "  speaker_map     Speaker Name Mapping 測試 (unit)"
             echo "  realtime_unit   所有 realtime 相關 unit tests"
+            echo "  refinement      Dual-Pass ASR refinement 測試 (unit)"
             echo ""
             echo "範例:"
             echo "  $0                    # 執行所有測試"
@@ -162,7 +163,8 @@ get_test_file() {
         s2t) echo "PYTEST:test_qwen3_s2t.py -k unit" ;;
         live_summary) echo "PYTEST:test_live_summary.py" ;;
         speaker_map) echo "PYTEST:test_speaker_mapping.py" ;;
-        realtime_unit) echo "PYTEST:test_qwen3_s2t.py -k unit test_live_summary.py test_speaker_mapping.py" ;;
+        realtime_unit) echo "PYTEST:test_qwen3_s2t.py -k unit test_live_summary.py test_speaker_mapping.py test_refinement.py" ;;
+        refinement) echo "PYTEST:test_refinement.py" ;;
         *) echo "" ;;
     esac
 }
@@ -209,6 +211,7 @@ else
     run_test "Qwen3-ASR 簡繁轉換 (unit)" "PYTEST:test_qwen3_s2t.py -k unit" ""
     run_test "Live Summary (unit)" "PYTEST:test_live_summary.py" ""
     run_test "Speaker Mapping (unit)" "PYTEST:test_speaker_mapping.py" ""
+    run_test "Refinement / Dual-Pass ASR (unit)" "PYTEST:test_refinement.py" ""
 fi
 
 # 顯示總結

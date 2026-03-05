@@ -1,6 +1,6 @@
 # Development Log — feature/realtime-asr
 
-## Current Status (2026-03-04)
+## Current Status (2026-03-05)
 
 ### Completed
 - Realtime ASR feature with mic capture, VAD-based chunking, silence detection
@@ -11,14 +11,26 @@
 - Suppressed `pad_token_id` console warning spam (transformers logger → ERROR)
 - Reduced `SILENCE_SPLIT_DURATION` from 0.6s to 0.4s for faster response feel
 - Added opencc simplified→traditional Chinese auto-conversion for Qwen3-ASR output
-- Added test suite `tests/test_qwen3_s2t.py`:
-  - 5 unit tests (opencc logic, no model needed) — all passing
-  - 3 integration tests (Qwen3-ASR + sample-01.mp4 + s2t verification) — pending execution
+- Live Summary (AWS Bedrock) — auto-summarize transcript periodically
+- Speaker Name Mapping — assign real names to SPEAKER_XX labels
+- Model loading state indicator (orange "Loading model..." button)
+- Mic preview VU meter (live before recording starts)
+- Device refresh with hardware re-scan for hot-plugged mics
+- **Dual-Pass ASR (Refinement)**:
+  - Incremental mode: re-transcribes ~30s segments in background with larger model while recording
+  - Post-recording mode: re-transcribes full recording after stopping for high-quality output
+  - New `gui/core/refinement_worker.py` with `IncrementalRefinementWorker` and `PostRecordingRefinementWorker`
+  - `realtime_worker.py` now emits `raw_chunk` signal for refinement pipeline
+  - UI: refinement settings group, refined transcript display, save refined output (TXT/SRT)
+  - 17 unit tests in `tests/test_refinement.py` — all passing
+- Test suite: `tests/test_qwen3_s2t.py`, `tests/test_live_summary.py`, `tests/test_speaker_mapping.py`, `tests/test_refinement.py`
+- Integrated test runner `run_tests.sh` with all test targets
 
 ### Pending / Not Yet Tested
+- **Dual-Pass ASR live test**: Unit tests pass, but not yet tested with actual mic input + model
+  - Incremental mode needs live recording to verify segment timing and replacement
+  - Post-recording mode needs a completed recording to verify full re-transcription
 - **opencc s2t conversion**: Code added, unit tests pass, but not yet tested live on device
-  - Need to install `opencc-python-reimplemented` and run realtime ASR to verify
-  - Integration tests written (`tests/test_qwen3_s2t.py -k integration`) but not yet executed (requires model load)
 
 ### Known Behaviors
 - Qwen3-ASR natively outputs simplified Chinese — opencc `s2t` converter handles conversion
