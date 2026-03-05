@@ -22,6 +22,12 @@ class RealtimePanel(QWidget):
         super().__init__(parent)
         self._worker = None
         self._session_texts = []
+        # Mic preview stream (for VU meter before recording)
+        self._preview_stream = None
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setInterval(100)
+        self._preview_timer.timeout.connect(self._update_preview_level)
+        self._preview_buffer = None
         # Live summary state
         self._summary_worker = None
         self._summary_pending_texts = []  # texts not yet summarized
@@ -31,6 +37,8 @@ class RealtimePanel(QWidget):
         self._summary_segment_threshold = 10  # trigger after N new segments
         self._summary_interval_sec = 60       # or after T seconds
         self._init_ui()
+        # Start mic preview immediately
+        self._start_mic_preview()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -79,6 +87,7 @@ class RealtimePanel(QWidget):
         settings_layout.addWidget(QLabel("Mic:"))
         self.device_combo = QComboBox()
         self._refresh_devices()
+        self.device_combo.currentIndexChanged.connect(self._on_device_changed)
         settings_layout.addWidget(self.device_combo)
 
         refresh_btn = QPushButton("↻")
@@ -228,9 +237,65 @@ class RealtimePanel(QWidget):
     def _refresh_devices(self):
         self.device_combo.clear()
         self.device_combo.addItem("Default", None)
+        # Force sounddevice to re-scan hardware
+        try:
+            import sounddevice as sd
+            sd._terminate()
+            sd._initialize()
+        except Exception:
+            pass
         devices = RealtimeASRWorker.list_audio_devices()
         for idx, name in devices:
             self.device_combo.addItem(name, idx)
+        # Restart preview with potentially new device
+        self._start_mic_preview()
+
+    # ---- Mic Preview (VU meter before recording) ----
+
+    def _start_mic_preview(self):
+        """Start a lightweight audio stream just for the VU meter."""
+        self._stop_mic_preview()
+        try:
+            import sounddevice as sd
+            import numpy as np
+
+            self._preview_buffer = np.array([], dtype=np.float32)
+            device_idx = self._get_device_index()
+
+            def preview_callback(indata, frames, time_info, status):
+                # Keep only last 1600 samples (~0.1s at 16kHz) for level calc
+                self._preview_buffer = indata[:, 0].copy()
+
+            self._preview_stream = sd.InputStream(
+                samplerate=16000,
+                channels=1,
+                dtype="float32",
+                blocksize=1600,
+                device=device_idx,
+                callback=preview_callback,
+            )
+            self._preview_stream.start()
+            self._preview_timer.start()
+        except Exception:
+            pass  # sounddevice not available or mic error — silently skip
+
+    def _stop_mic_preview(self):
+        """Stop the preview audio stream."""
+        self._preview_timer.stop()
+        if self._preview_stream is not None:
+            try:
+                self._preview_stream.stop()
+                self._preview_stream.close()
+            except Exception:
+                pass
+            self._preview_stream = None
+
+    def _update_preview_level(self):
+        """Update VU meter from preview stream."""
+        if self._preview_buffer is not None and len(self._preview_buffer) > 0:
+            import numpy as np
+            rms = float(np.sqrt(np.mean(self._preview_buffer ** 2)))
+            self.level_bar.setValue(int(min(rms * 10, 1.0) * 100))
 
     def _get_language(self):
         text = self.language_combo.currentText()
@@ -253,6 +318,11 @@ class RealtimePanel(QWidget):
 
     def _on_engine_changed(self, index):
         self._update_model_options()
+
+    def _on_device_changed(self, index):
+        """Restart mic preview when user selects a different device."""
+        if not (self._worker and self._worker.isRunning()):
+            self._start_mic_preview()
 
     def _update_model_options(self):
         engine = self.engine_combo.currentData()
@@ -277,6 +347,9 @@ class RealtimePanel(QWidget):
             self._start_recording()
 
     def _start_recording(self):
+        # Stop mic preview — worker will open its own stream
+        self._stop_mic_preview()
+
         self._worker = RealtimeASRWorker(
             language=self._get_language(),
             model_size=self._get_model(),
@@ -290,13 +363,15 @@ class RealtimePanel(QWidget):
         self._worker.stopped.connect(self._on_stopped)
         self._worker.start()
 
-        self.start_btn.setText("⏹ Stop")
+        # Show loading state — model init takes time
+        self.start_btn.setText("⏳ Loading model...")
+        self.start_btn.setEnabled(False)
         self.start_btn.setStyleSheet(
-            "QPushButton { background-color: #f44336; color: white; "
+            "QPushButton { background-color: #FF9800; color: white; "
             "font-size: 14px; font-weight: bold; border-radius: 6px; }"
-            "QPushButton:hover { background-color: #d32f2f; }"
         )
-        self.pause_btn.setEnabled(True)
+        self.status_label.setText("Loading model, please wait...")
+        self.pause_btn.setEnabled(False)
         self.language_combo.setEnabled(False)
         self.model_combo.setEnabled(False)
         self.device_combo.setEnabled(False)
@@ -333,6 +408,8 @@ class RealtimePanel(QWidget):
         self.device_combo.setEnabled(True)
         self.engine_combo.setEnabled(True)
         self.level_bar.setValue(0)
+        # Restart mic preview for VU meter
+        self._start_mic_preview()
 
     def _toggle_pause(self):
         if not self._worker:
@@ -361,6 +438,16 @@ class RealtimePanel(QWidget):
 
     def _on_status(self, msg):
         self.status_label.setText(msg)
+        # Transition from loading → recording when model is ready
+        if msg == "Listening...":
+            self.start_btn.setText("⏹ Stop")
+            self.start_btn.setEnabled(True)
+            self.start_btn.setStyleSheet(
+                "QPushButton { background-color: #f44336; color: white; "
+                "font-size: 14px; font-weight: bold; border-radius: 6px; }"
+                "QPushButton:hover { background-color: #d32f2f; }"
+            )
+            self.pause_btn.setEnabled(True)
 
     def _on_error(self, msg):
         self.status_label.setText("Error")
@@ -464,6 +551,7 @@ class RealtimePanel(QWidget):
 
     def cleanup(self):
         """Call on app exit to stop workers."""
+        self._stop_mic_preview()
         self._summary_timer.stop()
         if self._worker and self._worker.isRunning():
             self._worker.stop()
