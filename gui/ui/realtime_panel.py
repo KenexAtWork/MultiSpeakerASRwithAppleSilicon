@@ -4,16 +4,46 @@ Realtime ASR Panel - UI for live microphone transcription.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QComboBox, QTextEdit, QProgressBar, QGroupBox, QFileDialog,
-    QMessageBox, QSplitter, QSpinBox, QCheckBox,
+    QMessageBox, QSplitter, QSpinBox, QCheckBox, QLineEdit,
 )
-from PyQt6.QtCore import Qt, QDateTime, QTimer
-from PyQt6.QtGui import QFont, QTextCursor
+from PyQt6.QtCore import Qt, QDateTime, QTimer, QTime
+from PyQt6.QtGui import QFont, QTextCursor, QTextCharFormat, QColor
 from pathlib import Path
+import json
 import os
 
-from core.realtime_worker import RealtimeASRWorker, ENGINE_WHISPER, ENGINE_QWEN3
+from core.realtime_worker import RealtimeASRWorker, ENGINE_WHISPER, ENGINE_QWEN3, ENGINE_TRANSCRIBE
 from core.live_summary_worker import LiveSummaryWorker
 from core.refinement_worker import IncrementalRefinementWorker, PostRecordingRefinementWorker
+
+# Model repo IDs for download status detection
+_WHISPER_MODEL_REPOS = {
+    "tiny": "mlx-community/whisper-tiny-mlx",
+    "base": "mlx-community/whisper-base-mlx",
+    "small": "mlx-community/whisper-small-mlx",
+    "medium": "mlx-community/whisper-medium-mlx",
+    "large-v3-turbo": "mlx-community/whisper-large-v3-turbo",
+    "large": "mlx-community/whisper-large-v3-mlx",
+}
+_QWEN_MODEL_REPOS = {
+    "small": "Qwen/Qwen3-ASR-0.6B",
+    "large": "Qwen/Qwen3-ASR-1.7B",
+}
+
+
+def _is_model_downloaded(repo_id: str) -> bool:
+    """Check if a HuggingFace model is already cached locally."""
+    cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+    # HF cache uses models--org--name format
+    folder_name = "models--" + repo_id.replace("/", "--")
+    model_dir = cache_dir / folder_name
+    if not model_dir.exists():
+        return False
+    # Check that snapshots directory has content (model actually downloaded)
+    snapshots = model_dir / "snapshots"
+    if snapshots.exists() and any(snapshots.iterdir()):
+        return True
+    return False
 
 
 class RealtimePanel(QWidget):
@@ -41,6 +71,17 @@ class RealtimePanel(QWidget):
         self._incremental_worker = None
         self._post_worker = None
         self._refined_segments = []  # list of dicts from post-recording refinement
+        self._last_full_audio = None  # full audio for VOD bridge
+        # Recording timer state
+        self._recording_timer = QTimer(self)
+        self._recording_timer.setInterval(1000)
+        self._recording_timer.timeout.connect(self._update_recording_timer)
+        self._recording_elapsed = 0  # seconds
+        # Keyword highlight state
+        self._highlight_keywords = []
+        # Session history directory
+        self._session_dir = Path.home() / ".asr_sessions"
+        self._session_dir.mkdir(exist_ok=True)
         self._init_ui()
         # Start mic preview immediately
         self._start_mic_preview()
@@ -79,6 +120,7 @@ class RealtimePanel(QWidget):
         self.engine_combo = QComboBox()
         self.engine_combo.addItem("MLX Whisper", ENGINE_WHISPER)
         self.engine_combo.addItem("Qwen3-ASR", ENGINE_QWEN3)
+        self.engine_combo.addItem("AWS Transcribe", ENGINE_TRANSCRIBE)
         self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
         settings_layout.addWidget(self.engine_combo)
 
@@ -125,9 +167,17 @@ class RealtimePanel(QWidget):
         refine_layout.addSpacing(10)
         refine_layout.addWidget(QLabel("Refine model:"))
         self.refine_model_combo = QComboBox()
-        self.refine_model_combo.addItems([
-            "medium (~5-7 GB)", "small (~3-4 GB)", "large (~8-10 GB)",
-        ])
+        refine_items = [
+            ("large-v3-turbo", "large-v3-turbo (~6 GB, recommended)"),
+            ("medium", "medium (~5-7 GB)"),
+            ("small", "small (~3-4 GB)"),
+            ("large", "large (~8-10 GB)"),
+        ]
+        for key, label in refine_items:
+            repo = _WHISPER_MODEL_REPOS.get(key, "")
+            downloaded = _is_model_downloaded(repo) if repo else False
+            display = f"✅ {label}" if downloaded else f"⬇ {label}"
+            self.refine_model_combo.addItem(display)
         self.refine_model_combo.setToolTip("Model used for background refinement")
         refine_layout.addWidget(self.refine_model_combo)
 
@@ -164,15 +214,35 @@ class RealtimePanel(QWidget):
         self.save_btn.clicked.connect(self._save_transcript)
         ctrl_layout.addWidget(self.save_btn)
 
+        self.save_srt_btn = QPushButton("Save SRT")
+        self.save_srt_btn.setMinimumHeight(44)
+        self.save_srt_btn.setToolTip("Export live transcript as SRT with timestamps")
+        self.save_srt_btn.clicked.connect(self._save_transcript_as_srt)
+        ctrl_layout.addWidget(self.save_srt_btn)
+
+        self.history_btn = QPushButton("📂 History")
+        self.history_btn.setMinimumHeight(44)
+        self.history_btn.setToolTip("Open session history folder")
+        self.history_btn.clicked.connect(self._open_session_history)
+        ctrl_layout.addWidget(self.history_btn)
+
         layout.addLayout(ctrl_layout)
 
-        # Status bar with VU meter
+        # Status bar with VU meter and recording timer
         status_layout = QHBoxLayout()
         self.status_label = QLabel("Ready")
         self.status_label.setStyleSheet("color: #666;")
         status_layout.addWidget(self.status_label)
 
         status_layout.addStretch()
+
+        # Recording timer
+        self.timer_label = QLabel("⏱ 00:00:00")
+        self.timer_label.setStyleSheet(
+            "color: #999; font-size: 14px; font-weight: bold; font-family: monospace;"
+        )
+        self.timer_label.setToolTip("Recording duration")
+        status_layout.addWidget(self.timer_label)
 
         self.level_bar = QProgressBar()
         self.level_bar.setRange(0, 100)
@@ -195,6 +265,29 @@ class RealtimePanel(QWidget):
         # Transcript area
         transcript_group = QGroupBox("Live Transcript")
         transcript_layout = QVBoxLayout()
+
+        # Search bar
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("🔍 Search transcript...")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.textChanged.connect(self._on_search_changed)
+        search_layout.addWidget(self.search_input)
+
+        self.search_count_label = QLabel("")
+        self.search_count_label.setStyleSheet("color: #888; font-size: 11px;")
+        search_layout.addWidget(self.search_count_label)
+        transcript_layout.addLayout(search_layout)
+
+        # Keyword highlight input
+        kw_layout = QHBoxLayout()
+        kw_layout.addWidget(QLabel("Keywords:"))
+        self.keyword_input = QLineEdit()
+        self.keyword_input.setPlaceholderText("Enter keywords separated by commas (e.g. action item, deadline, TODO)")
+        self.keyword_input.setToolTip("Words to highlight in the transcript")
+        self.keyword_input.editingFinished.connect(self._on_keywords_changed)
+        kw_layout.addWidget(self.keyword_input)
+        transcript_layout.addLayout(kw_layout)
 
         self.transcript_edit = QTextEdit()
         self.transcript_edit.setReadOnly(True)
@@ -292,6 +385,18 @@ class RealtimePanel(QWidget):
         self.refine_save_btn.setEnabled(False)
         refine_status_row.addWidget(self.refine_save_btn)
 
+        self.refine_vod_btn = QPushButton("🎬 Send to VOD")
+        self.refine_vod_btn.setToolTip("Save recording and open in File Transcription tab for speaker diarization")
+        self.refine_vod_btn.clicked.connect(self._bridge_to_vod)
+        self.refine_vod_btn.setEnabled(False)
+        self.refine_vod_btn.setStyleSheet(
+            "QPushButton { background-color: #2196F3; color: white; "
+            "font-weight: bold; border-radius: 4px; padding: 4px 12px; }"
+            "QPushButton:hover { background-color: #1976D2; }"
+            "QPushButton:disabled { background-color: #ccc; }"
+        )
+        refine_status_row.addWidget(self.refine_vod_btn)
+
         refine_result_layout.addLayout(refine_status_row)
 
         self.refine_edit = QTextEdit()
@@ -378,12 +483,17 @@ class RealtimePanel(QWidget):
 
     def _get_model(self):
         text = self.model_combo.currentText()
+        # Strip download status prefix (✅ or ⬇)
+        if text.startswith("✅ ") or text.startswith("⬇ "):
+            text = text[2:]
         engine = self.engine_combo.currentData()
+        if engine == ENGINE_TRANSCRIBE:
+            return "cloud"
         if engine == ENGINE_QWEN3:
-            # Map UI label to a model_size hint the worker understands
-            # "small" -> worker picks 0.6B, anything else -> 1.7B
             return "small" if "0.6B" in text else "large"
-        return text.split(" ")[0]
+        # MLX Whisper: extract model size key
+        key = text.split(" ")[0]
+        return key  # e.g. "tiny", "base", "small", "medium", "large-v3-turbo", "large"
 
     def _get_device_index(self):
         return self.device_combo.currentData()
@@ -392,6 +502,7 @@ class RealtimePanel(QWidget):
         return self.engine_combo.currentData()
 
     def _on_engine_changed(self, index):
+        self.model_combo.setEnabled(True)
         self._update_model_options()
 
     def _on_device_changed(self, index):
@@ -403,17 +514,50 @@ class RealtimePanel(QWidget):
         engine = self.engine_combo.currentData()
         self.model_combo.clear()
         if engine == ENGINE_QWEN3:
-            self.model_combo.addItems([
-                "small (0.6B ~1.5 GB)",
-                "large (1.7B ~3.5 GB)",
-            ])
+            items = [
+                ("small", "small (0.6B ~1.5 GB)", _QWEN_MODEL_REPOS.get("small", "")),
+                ("large", "large (1.7B ~3.5 GB)", _QWEN_MODEL_REPOS.get("large", "")),
+            ]
+            for key, label, repo in items:
+                downloaded = _is_model_downloaded(repo) if repo else False
+                display = f"✅ {label}" if downloaded else f"⬇ {label}"
+                self.model_combo.addItem(display)
             self.model_combo.setCurrentIndex(0)
+        elif engine == ENGINE_TRANSCRIBE:
+            self.model_combo.addItems(["cloud (AWS managed)"])
+            self.model_combo.setEnabled(False)
         else:
-            self.model_combo.addItems([
-                "tiny (~1-2 GB)", "base (~2-3 GB)",
-                "small (~3-4 GB)", "medium (~5-7 GB)",
-            ])
-            self.model_combo.setCurrentIndex(1)
+            self.model_combo.setEnabled(True)
+            items = [
+                ("tiny", "tiny (~1-2 GB)"),
+                ("base", "base (~2-3 GB)"),
+                ("small", "small (~3-4 GB)"),
+                ("medium", "medium (~5-7 GB)"),
+                ("large-v3-turbo", "large-v3-turbo (~6 GB, recommended)"),
+                ("large", "large (~8-10 GB)"),
+            ]
+            for key, label in items:
+                repo = _WHISPER_MODEL_REPOS.get(key, "")
+                downloaded = _is_model_downloaded(repo) if repo else False
+                display = f"✅ {label}" if downloaded else f"⬇ {label}"
+                self.model_combo.addItem(display)
+            self.model_combo.setCurrentIndex(4)  # default to turbo
+        # Apply dimmed styling to undownloaded items
+        self._style_model_combo()
+    def _style_model_combo(self):
+        """Apply visual styling: dimmed color for undownloaded models."""
+        for i in range(self.model_combo.count()):
+            text = self.model_combo.itemText(i)
+            if text.startswith("⬇"):
+                self.model_combo.setItemData(i, QColor("#999999"), Qt.ItemDataRole.ForegroundRole)
+            else:
+                self.model_combo.setItemData(i, QColor("#2e7d32"), Qt.ItemDataRole.ForegroundRole)
+    def _get_refine_model(self):
+        """Extract model key from refine model combo, stripping download status prefix."""
+        text = self.refine_model_combo.currentText()
+        if text.startswith("✅ ") or text.startswith("⬇ "):
+            text = text[2:]
+        return text.split(" ")[0]
 
     def _toggle_recording(self):
         if self._worker and self._worker.isRunning():
@@ -457,9 +601,17 @@ class RealtimePanel(QWidget):
             interval = self.summary_interval_spin.value() * 1000
             self._summary_timer.start(interval)
 
+        # Start recording timer
+        self._recording_elapsed = 0
+        self.timer_label.setText("⏱ 00:00:00")
+        self.timer_label.setStyleSheet(
+            "color: #f44336; font-size: 14px; font-weight: bold; font-family: monospace;"
+        )
+        self._recording_timer.start()
+
         # Start incremental refinement if enabled
         if self.refine_incremental_cb.isChecked():
-            refine_model = self.refine_model_combo.currentText().split(" ")[0]
+            refine_model = self._get_refine_model()
             self._incremental_worker = IncrementalRefinementWorker(
                 engine=self._get_engine(),
                 model_size=refine_model,
@@ -490,6 +642,12 @@ class RealtimePanel(QWidget):
 
     def _on_stopped(self):
         self._summary_timer.stop()
+        self._recording_timer.stop()
+        self.timer_label.setStyleSheet(
+            "color: #999; font-size: 14px; font-weight: bold; font-family: monospace;"
+        )
+        # Auto-save session history
+        self._auto_save_session()
         # Final summary on stop if there are pending texts
         if self.summary_enabled.isChecked() and self._summary_pending_texts:
             self._trigger_summary()
@@ -498,6 +656,19 @@ class RealtimePanel(QWidget):
         if self._incremental_worker and self._incremental_worker.isRunning():
             self._incremental_worker.stop()
             self._incremental_worker.wait(3000)
+
+        # Capture full audio for VOD bridge
+        import numpy as np
+        self._last_full_audio = None
+        if self._incremental_worker:
+            self._last_full_audio = self._incremental_worker.get_full_audio()
+        elif hasattr(self, '_raw_audio_chunks') and self._raw_audio_chunks:
+            self._last_full_audio = np.concatenate(self._raw_audio_chunks)
+
+        # Enable VOD bridge if we have audio
+        if self._last_full_audio is not None and len(self._last_full_audio) >= 16000:
+            self.refine_vod_btn.setEnabled(True)
+            self.refine_group.setVisible(True)
 
         # Trigger post-recording refinement
         if self.refine_post_cb.isChecked():
@@ -534,7 +705,15 @@ class RealtimePanel(QWidget):
         self._session_texts.append(text)
         self._summary_pending_texts.append(text)
         timestamp = QDateTime.currentDateTime().toString("hh:mm:ss")
-        self.transcript_edit.append(f"[{timestamp}] {text}")
+        line = f"[{timestamp}] {text}"
+
+        # Append with keyword highlighting
+        if self._highlight_keywords:
+            self.transcript_edit.append(line)
+            self._apply_keyword_highlights()
+        else:
+            self.transcript_edit.append(line)
+
         # Auto-scroll to bottom
         cursor = self.transcript_edit.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
@@ -650,7 +829,7 @@ class RealtimePanel(QWidget):
         if full_audio is None or len(full_audio) < 16000:
             return  # too short, skip
 
-        refine_model = self.refine_model_combo.currentText().split(" ")[0]
+        refine_model = self._get_refine_model()
         self._post_worker = PostRecordingRefinementWorker(
             audio=full_audio,
             engine=self._get_engine(),
@@ -733,6 +912,49 @@ class RealtimePanel(QWidget):
                 start_srt = self._sec_to_srt_time(start)
                 end_srt = self._sec_to_srt_time(end)
                 f.write(f"{i}\n{start_srt} --> {end_srt}\n{seg['text']}\n\n")
+    def _bridge_to_vod(self):
+        """Save recorded audio as WAV and open it in the File Transcription (VOD) tab."""
+        if self._last_full_audio is None or len(self._last_full_audio) < 16000:
+            QMessageBox.information(self, "Bridge to VOD", "No recorded audio available.")
+            return
+
+        # Save audio as WAV
+        import wave
+        import numpy as np
+        from datetime import datetime
+
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        default_path = str(Path.home() / f"recording_{ts}.wav")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Recording for VOD Processing",
+            default_path,
+            "WAV Files (*.wav);;All Files (*)",
+        )
+        if not path:
+            return
+
+        try:
+            audio_int16 = (self._last_full_audio * 32767).astype(np.int16)
+            with wave.open(path, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(16000)
+                wf.writeframes(audio_int16.tobytes())
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save audio: {e}")
+            return
+
+        # Switch to VOD tab and load the file
+        main_window = self.window()
+        if hasattr(main_window, 'tabs') and hasattr(main_window, 'set_current_file'):
+            main_window.tabs.setCurrentIndex(0)  # Switch to File Transcription tab
+            main_window.set_current_file(path)
+            self.status_label.setText(f"✅ Audio saved and loaded in VOD tab")
+        else:
+            QMessageBox.information(
+                self, "Saved",
+                f"Audio saved to:\n{path}\n\nSwitch to File Transcription tab and load this file."
+            )
 
     @staticmethod
     def _sec_to_srt_time(sec):
@@ -756,7 +978,9 @@ class RealtimePanel(QWidget):
         self._refined_segments = []
         self.refine_group.setVisible(False)
         self.refine_save_btn.setEnabled(False)
+        self.refine_vod_btn.setEnabled(False)
         self.refine_status_label.setText("")
+        self._last_full_audio = None
 
     def _save_transcript(self):
         if not self._session_texts:
@@ -799,10 +1023,164 @@ class RealtimePanel(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save: {e}")
 
+    # ---- Recording Timer ----
+
+    def _update_recording_timer(self):
+        """Update the recording duration display."""
+        self._recording_elapsed += 1
+        h = self._recording_elapsed // 3600
+        m = (self._recording_elapsed % 3600) // 60
+        s = self._recording_elapsed % 60
+        self.timer_label.setText(f"⏱ {h:02d}:{m:02d}:{s:02d}")
+
+    # ---- Transcript Search ----
+
+    def _on_search_changed(self, text):
+        """Highlight search matches in transcript."""
+        # Clear previous highlights
+        cursor = self.transcript_edit.textCursor()
+        cursor.select(QTextCursor.SelectionType.Document)
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor("transparent"))
+        cursor.mergeCharFormat(fmt)
+        cursor.clearSelection()
+
+        if not text.strip():
+            self.search_count_label.setText("")
+            # Re-apply keyword highlights if any
+            if self._highlight_keywords:
+                self._apply_keyword_highlights()
+            return
+
+        # Search and highlight
+        doc = self.transcript_edit.document()
+        highlight_fmt = QTextCharFormat()
+        highlight_fmt.setBackground(QColor("#FFEB3B"))
+        count = 0
+        cursor = doc.find(text)
+        while not cursor.isNull():
+            cursor.mergeCharFormat(highlight_fmt)
+            count += 1
+            cursor = doc.find(text, cursor)
+
+        self.search_count_label.setText(f"{count} match{'es' if count != 1 else ''}")
+
+    # ---- Keyword Highlight ----
+
+    def _on_keywords_changed(self):
+        """Parse keyword input and re-apply highlights."""
+        raw = self.keyword_input.text().strip()
+        if raw:
+            self._highlight_keywords = [kw.strip() for kw in raw.split(",") if kw.strip()]
+        else:
+            self._highlight_keywords = []
+        self._apply_keyword_highlights()
+
+    def _apply_keyword_highlights(self):
+        """Apply keyword highlighting to the entire transcript."""
+        if not self._highlight_keywords:
+            return
+        doc = self.transcript_edit.document()
+        highlight_fmt = QTextCharFormat()
+        highlight_fmt.setBackground(QColor("#B3E5FC"))
+        highlight_fmt.setForeground(QColor("#01579B"))
+        for kw in self._highlight_keywords:
+            cursor = doc.find(kw)
+            while not cursor.isNull():
+                cursor.mergeCharFormat(highlight_fmt)
+                cursor = doc.find(kw, cursor)
+
+    # ---- Export Realtime Transcript as SRT ----
+
+    def _save_transcript_as_srt(self):
+        """Export live transcript as SRT file using timestamps from the text."""
+        if not self._session_texts:
+            QMessageBox.information(self, "Save", "No transcript to save.")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Transcript as SRT",
+            str(Path.home() / "realtime_transcript.srt"),
+            "SRT Files (*.srt);;All Files (*)",
+        )
+        if not path:
+            return
+
+        try:
+            lines = self.transcript_edit.toPlainText().strip().split("\n")
+            with open(path, "w", encoding="utf-8") as f:
+                idx = 1
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # Parse [HH:MM:SS] prefix
+                    if line.startswith("[") and "]" in line:
+                        ts_end = line.index("]")
+                        ts_str = line[1:ts_end]
+                        text = line[ts_end + 1:].strip()
+                        # Create SRT timestamp (use same time for start, +3s for end)
+                        start_srt = f"00:{ts_str},000" if ts_str.count(":") == 2 else f"{ts_str},000"
+                        # Parse to compute end time
+                        parts = ts_str.split(":")
+                        if len(parts) == 3:
+                            total_sec = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                        elif len(parts) == 2:
+                            total_sec = int(parts[0]) * 60 + int(parts[1])
+                        else:
+                            total_sec = 0
+                        end_sec = total_sec + 3
+                        end_srt = self._sec_to_srt_time(end_sec)
+                        if ts_str.count(":") == 2:
+                            start_srt = self._sec_to_srt_time(total_sec)
+                        f.write(f"{idx}\n{start_srt} --> {end_srt}\n{text}\n\n")
+                        idx += 1
+            QMessageBox.information(self, "Saved", f"SRT saved to:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save SRT: {e}")
+
+    # ---- Session History ----
+
+    def _auto_save_session(self):
+        """Auto-save current session transcript and notes to history."""
+        if not self._session_texts:
+            return
+        ts = QDateTime.currentDateTime().toString("yyyyMMdd-HHmmss")
+        session_file = self._session_dir / f"session_{ts}.json"
+        duration_str = self.timer_label.text().replace("⏱ ", "")
+        data = {
+            "timestamp": ts,
+            "duration": duration_str,
+            "duration_seconds": self._recording_elapsed,
+            "engine": self.engine_combo.currentText(),
+            "language": self.language_combo.currentText(),
+            "transcript_lines": self.transcript_edit.toPlainText().split("\n"),
+            "summary": self._current_summary,
+            "segment_count": len(self._session_texts),
+        }
+        try:
+            with open(session_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass  # silently fail — don't interrupt user flow
+
+    def _open_session_history(self):
+        """Open the session history folder in Finder."""
+        import subprocess
+        self._session_dir.mkdir(exist_ok=True)
+        try:
+            subprocess.Popen(["open", str(self._session_dir)])
+        except Exception:
+            QMessageBox.information(
+                self, "Session History",
+                f"Session files are saved at:\n{self._session_dir}"
+            )
+
     def cleanup(self):
         """Call on app exit to stop workers."""
         self._stop_mic_preview()
         self._summary_timer.stop()
+        self._recording_timer.stop()
         if self._worker and self._worker.isRunning():
             self._worker.stop()
             self._worker.wait(3000)

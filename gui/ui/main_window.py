@@ -19,7 +19,7 @@ import boto3
 
 from core.asr_worker import ASRWorker
 from core.summary_worker import SummaryWorker, DEFAULT_PROMPT
-from ui.realtime_panel import RealtimePanel
+from ui.realtime_panel import RealtimePanel, _WHISPER_MODEL_REPOS, _is_model_downloaded
 
 
 class DropZone(QLabel):
@@ -181,12 +181,27 @@ class MainWindow(QMainWindow):
         row1.addSpacing(15)
         row1.addWidget(QLabel("模型:"))
         self.model_combo = QComboBox()
-        self.model_combo.addItems([
-            "tiny (~1-2 GB)", "base (~2-3 GB)", 
-            "small (~3-4 GB)", "medium (~5-7 GB)", 
-            "large (~8-10 GB)"
-        ])
-        self.model_combo.setCurrentIndex(3)
+        _vod_model_items = [
+            ("tiny", "tiny (~1-2 GB)"),
+            ("base", "base (~2-3 GB)"),
+            ("small", "small (~3-4 GB)"),
+            ("medium", "medium (~5-7 GB)"),
+            ("large-v3-turbo", "large-v3-turbo (~6 GB, recommended)"),
+            ("large", "large (~8-10 GB)"),
+        ]
+        for key, label in _vod_model_items:
+            repo = _WHISPER_MODEL_REPOS.get(key, "")
+            downloaded = _is_model_downloaded(repo) if repo else False
+            display = f"✅ {label}" if downloaded else f"⬇ {label}"
+            self.model_combo.addItem(display)
+        self.model_combo.setCurrentIndex(4)  # default to turbo
+        # Style: dim undownloaded models
+        for i in range(self.model_combo.count()):
+            text = self.model_combo.itemText(i)
+            if text.startswith("⬇"):
+                self.model_combo.setItemData(i, QColor("#999999"), Qt.ItemDataRole.ForegroundRole)
+            else:
+                self.model_combo.setItemData(i, QColor("#2e7d32"), Qt.ItemDataRole.ForegroundRole)
         row1.addWidget(self.model_combo)
         row1.addSpacing(15)
         row1.addWidget(QLabel("格式:"))
@@ -593,7 +608,11 @@ class MainWindow(QMainWindow):
         saved_model = self._read_env('ASR_MODEL')
         if saved_model:
             for i in range(self.model_combo.count()):
-                if self.model_combo.itemText(i).startswith(saved_model):
+                item_text = self.model_combo.itemText(i)
+                # Strip download status prefix for matching
+                if item_text.startswith("✅ ") or item_text.startswith("⬇ "):
+                    item_text = item_text[2:]
+                if item_text.startswith(saved_model):
                     self.model_combo.setCurrentIndex(i)
                     break
         # 語言
@@ -618,9 +637,16 @@ class MainWindow(QMainWindow):
         if saved_skip is not None:
             self.skip_diarization_cb.setChecked(saved_skip.lower() == 'true')
     
+    def _get_model_key(self):
+        """Extract model key from model combo, stripping download status prefix."""
+        text = self.model_combo.currentText()
+        if text.startswith("✅ ") or text.startswith("⬇ "):
+            text = text[2:]
+        return text.split()[0]
+
     def _save_asr_settings(self):
         """將目前 ASR 設定儲存到 .env"""
-        model = self.model_combo.currentText().split()[0]
+        model = self._get_model_key()
         language = self.language_combo.currentText().split()[0]
         fmt = self.format_combo.currentText()
         self._write_env('ASR_MODEL', model)
@@ -662,7 +688,7 @@ class MainWindow(QMainWindow):
 
         # 取得設定
         language = self.language_combo.currentText().split()[0]
-        model = self.model_combo.currentText().split()[0]
+        model = self._get_model_key()
         output_format = self.format_combo.currentText().lower()
         skip_diarization = self.skip_diarization_cb.isChecked()
         use_gpu = self.use_gpu_cb.isChecked()
