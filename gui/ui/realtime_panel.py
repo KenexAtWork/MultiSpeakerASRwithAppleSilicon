@@ -425,8 +425,20 @@ class RealtimePanel(QWidget):
         except Exception:
             pass
         devices = RealtimeASRWorker.list_audio_devices()
+        has_loopback = False
         for idx, name in devices:
             self.device_combo.addItem(name, idx)
+            if "blackhole" in name.lower() or "loopback" in name.lower():
+                has_loopback = True
+        # Hint for virtual audio device
+        if not has_loopback:
+            self.device_combo.setToolTip(
+                "To record system audio (e.g. online meetings), install BlackHole:\n"
+                "brew install blackhole-2ch\n"
+                "Then create a Multi-Output Device in Audio MIDI Setup."
+            )
+        else:
+            self.device_combo.setToolTip("Select BlackHole to capture system audio (online meetings)")
         # Restart preview with potentially new device
         self._start_mic_preview()
 

@@ -337,6 +337,33 @@ for video in videos/*.mp4; do
 done
 ```
 
+## 🎧 Recording Online Meetings (System Audio Capture)
+
+To transcribe online meetings (Zoom, Teams, Google Meet, etc.), you need to capture system audio using a virtual audio device.
+
+### Setup with BlackHole (Free, Open Source)
+
+```bash
+# Install BlackHole 2-channel
+brew install blackhole-2ch
+```
+
+After installation:
+
+1. Open **Audio MIDI Setup** (search in Spotlight)
+2. Click **+** at bottom left → **Create Multi-Output Device**
+3. Check both your speakers/headphones AND **BlackHole 2ch**
+4. Set this Multi-Output Device as your system output (System Settings → Sound → Output)
+5. In Realtime ASR, click **↻** to refresh devices, then select **BlackHole 2ch** as input
+
+Now system audio (meeting voices) will be captured by the ASR.
+
+**Tip:** To record both your mic and system audio simultaneously, create an **Aggregate Device** in Audio MIDI Setup that combines your mic + BlackHole.
+
+### Alternative: Loopback (Paid)
+
+[Loopback by Rogue Amoeba](https://rogueamoeba.com/loopback/) provides a more user-friendly interface for audio routing, but requires a paid license.
+
 ## ❓ Troubleshooting
 
 ### GUI Issues
