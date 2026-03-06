@@ -8,8 +8,16 @@ Graphical interface version built with PyQt6.
 - ✅ Real-time processing progress display
 - ✅ Real-time processing log updates
 - ✅ Support for multiple languages and model selection
+- ✅ Model download status indicator (✅ downloaded / ⬇ not yet downloaded)
 - ✅ Selectable output format (SRT/TXT)
 - ✅ Background processing, UI doesn't freeze
+- ✅ Realtime ASR — live microphone transcription with MLX Whisper, Qwen3-ASR, or AWS Transcribe
+- ✅ System audio capture for online meetings (via BlackHole)
+- ✅ Dual-pass ASR refinement (incremental + post-recording)
+- ✅ Send to VOD — bridge realtime recording to File Transcription for speaker diarization
+- ✅ Live Notes — auto-summarize transcript via AWS Bedrock during recording
+- ✅ Subtitle editing with audio playback and click-to-jump
+- ✅ AWS Bedrock meeting summarization
 
 ## System Requirements
 
@@ -143,10 +151,15 @@ gui/
 ├── main.py              # Main program entry
 ├── ui/
 │   ├── __init__.py
-│   └── main_window.py   # Main window UI
+│   ├── main_window.py   # Main window UI (File Transcription tab)
+│   └── realtime_panel.py # Realtime ASR tab
 ├── core/
 │   ├── __init__.py
-│   └── asr_worker.py    # Background processing Worker
+│   ├── asr_worker.py    # Background ASR processing Worker
+│   ├── realtime_worker.py    # Realtime mic transcription Worker
+│   ├── refinement_worker.py  # Dual-pass refinement Workers
+│   ├── summary_worker.py     # AWS Bedrock summary Worker
+│   └── live_summary_worker.py # Live summary during recording
 ├── utils/
 │   └── __init__.py
 ├── resources/           # Resource files (icons, etc.)
@@ -166,16 +179,25 @@ gui/
 ### Key Components
 
 1. **MainWindow** (`ui/main_window.py`)
-   - Main window UI
-   - Handles user interactions
-   - Displays progress and logs
+   - File Transcription tab UI
+   - Model selection with download status indicators
+   - Subtitle editing, audio playback, speaker mapping
+   - AWS Bedrock summarization
 
-2. **ASRWorker** (`core/asr_worker.py`)
+2. **RealtimePanel** (`ui/realtime_panel.py`)
+   - Live microphone transcription
+   - Multiple engine support (MLX Whisper, Qwen3-ASR, AWS Transcribe)
+   - System audio capture via BlackHole for online meetings
+   - Dual-pass refinement (incremental + post-recording)
+   - Send to VOD bridge for speaker diarization
+   - Live Notes auto-summary
+
+3. **ASRWorker** (`core/asr_worker.py`)
    - Executes ASR in background thread
    - Sends progress and log signals
    - Handles errors
 
-3. **DropZone** (`ui/main_window.py`)
+4. **DropZone** (`ui/main_window.py`)
    - Custom drag and drop area
    - Supports file drag and drop
 

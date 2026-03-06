@@ -8,8 +8,16 @@
 - ✅ 即時處理進度顯示
 - ✅ 處理日誌即時更新
 - ✅ 支援多種語言和模型選擇
+- ✅ 模型下載狀態標示（✅ 已下載 / ⬇ 未下載）
 - ✅ 可選擇輸出格式（SRT/TXT）
 - ✅ 背景處理，UI 不凍結
+- ✅ 即時 ASR — 麥克風即時轉錄，支援 MLX Whisper、Qwen3-ASR、AWS Transcribe
+- ✅ 系統音訊擷取 — 透過 BlackHole 錄製線上會議（Zoom、Teams 等）
+- ✅ 雙重 ASR 精煉（錄音中漸進式 + 錄音後完整精煉）
+- ✅ 轉送 VOD — 將即時錄音轉送至檔案轉錄進行說話者分離
+- ✅ 即時筆記 — 錄音中透過 AWS Bedrock 自動摘要
+- ✅ 字幕編輯、音訊播放、點擊跳轉
+- ✅ AWS Bedrock 會議摘要
 
 ## 系統需求
 
@@ -143,10 +151,15 @@ gui/
 ├── main.py              # 主程式入口
 ├── ui/
 │   ├── __init__.py
-│   └── main_window.py   # 主視窗 UI
+│   ├── main_window.py   # 主視窗 UI（檔案轉錄分頁）
+│   └── realtime_panel.py # 即時 ASR 分頁
 ├── core/
 │   ├── __init__.py
-│   └── asr_worker.py    # 背景處理 Worker
+│   ├── asr_worker.py         # 背景 ASR 處理 Worker
+│   ├── realtime_worker.py    # 即時麥克風轉錄 Worker
+│   ├── refinement_worker.py  # 雙重精煉 Workers
+│   ├── summary_worker.py     # AWS Bedrock 摘要 Worker
+│   └── live_summary_worker.py # 錄音中即時摘要
 ├── utils/
 │   └── __init__.py
 ├── resources/           # 資源檔案（圖示等）
@@ -166,16 +179,25 @@ gui/
 ### 關鍵組件
 
 1. **MainWindow** (`ui/main_window.py`)
-   - 主視窗 UI
-   - 處理用戶互動
-   - 顯示進度和日誌
+   - 檔案轉錄分頁 UI
+   - 模型選擇含下載狀態標示
+   - 字幕編輯、音訊播放、說話者對應
+   - AWS Bedrock 摘要
 
-2. **ASRWorker** (`core/asr_worker.py`)
+2. **RealtimePanel** (`ui/realtime_panel.py`)
+   - 麥克風即時轉錄
+   - 多引擎支援（MLX Whisper、Qwen3-ASR、AWS Transcribe）
+   - 透過 BlackHole 擷取系統音訊錄製線上會議
+   - 雙重 ASR 精煉（漸進式 + 錄音後）
+   - 轉送 VOD 進行說話者分離
+   - 即時筆記自動摘要
+
+3. **ASRWorker** (`core/asr_worker.py`)
    - 在背景執行緒中執行 ASR
    - 發送進度和日誌信號
    - 處理錯誤
 
-3. **DropZone** (`ui/main_window.py`)
+4. **DropZone** (`ui/main_window.py`)
    - 自定義拖放區域
    - 支援拖放檔案
 
