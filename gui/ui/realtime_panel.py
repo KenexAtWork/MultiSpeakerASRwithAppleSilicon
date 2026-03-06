@@ -452,11 +452,14 @@ class RealtimePanel(QWidget):
             import numpy as np
 
             self._preview_buffer = np.array([], dtype=np.float32)
+            self._preview_error_count = 0
             device_idx = self._get_device_index()
 
             def preview_callback(indata, frames, time_info, status):
-                # Keep only last 1600 samples (~0.1s at 16kHz) for level calc
-                self._preview_buffer = indata[:, 0].copy()
+                try:
+                    self._preview_buffer = indata[:, 0].copy()
+                except Exception:
+                    pass
 
             self._preview_stream = sd.InputStream(
                 samplerate=16000,
@@ -469,7 +472,9 @@ class RealtimePanel(QWidget):
             self._preview_stream.start()
             self._preview_timer.start()
         except Exception:
-            pass  # sounddevice not available or mic error — silently skip
+            # Device unavailable — reset VU and don't start timer
+            self.level_bar.setValue(0)
+            self._preview_stream = None
 
     def _stop_mic_preview(self):
         """Stop the preview audio stream."""
@@ -484,10 +489,18 @@ class RealtimePanel(QWidget):
 
     def _update_preview_level(self):
         """Update VU meter from preview stream."""
-        if self._preview_buffer is not None and len(self._preview_buffer) > 0:
-            import numpy as np
-            rms = float(np.sqrt(np.mean(self._preview_buffer ** 2)))
-            self.level_bar.setValue(int(min(rms * 10, 1.0) * 100))
+        # Check if stream is still active
+        if self._preview_stream is None or not self._preview_stream.active:
+            self._preview_timer.stop()
+            self.level_bar.setValue(0)
+            return
+        try:
+            if self._preview_buffer is not None and len(self._preview_buffer) > 0:
+                import numpy as np
+                rms = float(np.sqrt(np.mean(self._preview_buffer ** 2)))
+                self.level_bar.setValue(int(min(rms * 10, 1.0) * 100))
+        except Exception:
+            self.level_bar.setValue(0)
 
     def _get_language(self):
         text = self.language_combo.currentText()
