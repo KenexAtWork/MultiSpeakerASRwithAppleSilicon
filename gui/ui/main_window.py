@@ -196,12 +196,15 @@ class MainWindow(QMainWindow):
             self.model_combo.addItem(display)
         self.model_combo.setCurrentIndex(4)  # default to turbo
         # Style: dim undownloaded models
+        model_item_model = self.model_combo.model()
         for i in range(self.model_combo.count()):
             text = self.model_combo.itemText(i)
-            if text.startswith("⬇"):
-                self.model_combo.setItemData(i, QColor("#999999"), Qt.ItemDataRole.ForegroundRole)
-            else:
-                self.model_combo.setItemData(i, QColor("#2e7d32"), Qt.ItemDataRole.ForegroundRole)
+            item = model_item_model.item(i)
+            if item:
+                if text.startswith("⬇"):
+                    item.setForeground(QColor("#999999"))
+                else:
+                    item.setForeground(QColor("#2e7d32"))
         row1.addWidget(self.model_combo)
         row1.addSpacing(15)
         row1.addWidget(QLabel("格式:"))

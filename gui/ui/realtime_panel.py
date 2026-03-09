@@ -179,6 +179,16 @@ class RealtimePanel(QWidget):
             display = f"✅ {label}" if downloaded else f"⬇ {label}"
             self.refine_model_combo.addItem(display)
         self.refine_model_combo.setToolTip("Model used for background refinement")
+        # Style refine model combo
+        refine_item_model = self.refine_model_combo.model()
+        for i in range(self.refine_model_combo.count()):
+            text = self.refine_model_combo.itemText(i)
+            item = refine_item_model.item(i)
+            if item:
+                if text.startswith("⬇"):
+                    item.setForeground(QColor("#999999"))
+                else:
+                    item.setForeground(QColor("#2e7d32"))
         refine_layout.addWidget(self.refine_model_combo)
 
         refine_layout.addStretch()
@@ -570,13 +580,17 @@ class RealtimePanel(QWidget):
         # Apply dimmed styling to undownloaded items
         self._style_model_combo()
     def _style_model_combo(self):
-        """Apply visual styling: dimmed color for undownloaded models."""
+        """Apply visual styling: dimmed color for undownloaded models via stylesheet."""
+        # Use item model to set foreground color without triggering QTextCursor issues
+        model = self.model_combo.model()
         for i in range(self.model_combo.count()):
             text = self.model_combo.itemText(i)
-            if text.startswith("⬇"):
-                self.model_combo.setItemData(i, QColor("#999999"), Qt.ItemDataRole.ForegroundRole)
-            else:
-                self.model_combo.setItemData(i, QColor("#2e7d32"), Qt.ItemDataRole.ForegroundRole)
+            item = model.item(i)
+            if item:
+                if text.startswith("⬇"):
+                    item.setForeground(QColor("#999999"))
+                else:
+                    item.setForeground(QColor("#2e7d32"))
     def _get_refine_model(self):
         """Extract model key from refine model combo, stripping download status prefix."""
         text = self.refine_model_combo.currentText()
@@ -1062,6 +1076,11 @@ class RealtimePanel(QWidget):
 
     def _on_search_changed(self, text):
         """Highlight search matches in transcript."""
+        # Skip if document is empty
+        if self.transcript_edit.document().isEmpty():
+            self.search_count_label.setText("")
+            return
+
         # Clear previous highlights
         cursor = self.transcript_edit.textCursor()
         cursor.select(QTextCursor.SelectionType.Document)
@@ -1072,7 +1091,6 @@ class RealtimePanel(QWidget):
 
         if not text.strip():
             self.search_count_label.setText("")
-            # Re-apply keyword highlights if any
             if self._highlight_keywords:
                 self._apply_keyword_highlights()
             return
