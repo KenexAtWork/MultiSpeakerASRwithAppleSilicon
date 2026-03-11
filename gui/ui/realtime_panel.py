@@ -656,24 +656,16 @@ class RealtimePanel(QWidget):
         )
         self._recording_timer.start()
 
-        # Start incremental refinement if enabled (MLX Whisper only)
+        # Defer incremental refinement — will be started in _on_status when main model is ready
+        # This avoids two MLX models loading on Metal GPU simultaneously (crash)
+        self._pending_incremental_refine = False
         can_refine = self._get_engine() == ENGINE_WHISPER
         if can_refine and self.refine_incremental_cb.isChecked():
-            refine_model = self._get_refine_model()
-            self._incremental_worker = IncrementalRefinementWorker(
-                engine=self._get_engine(),
-                model_size=refine_model,
-                language=self._get_language(),
-                segment_duration=30,
-            )
-            self._incremental_worker.segment_refined.connect(self._on_incremental_refined)
-            self._incremental_worker.status.connect(self._on_refine_status)
-            self._incremental_worker.error.connect(self._on_refine_error)
+            self._pending_incremental_refine = True
             self._worker.raw_chunk.connect(self._feed_incremental_chunk)
-            self._incremental_worker.start()
             self.refine_group.setVisible(True)
             self.refine_edit.clear()
-            self.refine_status_label.setText("⏳ Incremental refinement starting...")
+            self.refine_status_label.setText("⏳ Waiting for main model to load...")
 
         # Connect raw_chunk for post-recording (always, to accumulate audio)
         if can_refine and (self.refine_post_cb.isChecked() or self.refine_incremental_cb.isChecked()):
@@ -784,6 +776,22 @@ class RealtimePanel(QWidget):
                 "QPushButton:hover { background-color: #d32f2f; }"
             )
             self.pause_btn.setEnabled(True)
+
+            # Start deferred incremental refinement now that main model is loaded
+            if self._pending_incremental_refine:
+                self._pending_incremental_refine = False
+                refine_model = self._get_refine_model()
+                self._incremental_worker = IncrementalRefinementWorker(
+                    engine=self._get_engine(),
+                    model_size=refine_model,
+                    language=self._get_language(),
+                    segment_duration=30,
+                )
+                self._incremental_worker.segment_refined.connect(self._on_incremental_refined)
+                self._incremental_worker.status.connect(self._on_refine_status)
+                self._incremental_worker.error.connect(self._on_refine_error)
+                self._incremental_worker.start()
+                self.refine_status_label.setText("⏳ Incremental refinement starting...")
 
     def _on_error(self, msg):
         self.status_label.setText("Error")
