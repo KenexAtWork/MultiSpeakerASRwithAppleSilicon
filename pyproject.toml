@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "ASR with speaker diarization for Apple Silicon Mac"
 requires-python = ">=3.10"
 dependencies = [
-    "mlx-whisper>=0.3.0",
+    "mlx-whisper>=0.4.1",
     "torch>=2.8.0",
     "torchaudio>=2.8.0",
     "pyannote-audio>=3.5.0",
@@ -26,6 +26,7 @@ realtime = [
 ]
 aws = [
     "boto3>=1.26.0",
+    "amazon-transcribe>=0.6.0",
 ]
 dev = [
     "pytest>=7.0.0",

@@ -778,12 +778,14 @@ class RealtimePanel(QWidget):
             self.pause_btn.setEnabled(True)
 
             # Start deferred incremental refinement now that main model is loaded
+            # IMPORTANT: Use the SAME model as main ASR to avoid loading a second
+            # model into GPU memory (16GB Macs will segfault with two large models)
             if self._pending_incremental_refine:
                 self._pending_incremental_refine = False
-                refine_model = self._get_refine_model()
+                main_model = self._get_model()  # same model — no extra GPU memory
                 self._incremental_worker = IncrementalRefinementWorker(
                     engine=self._get_engine(),
-                    model_size=refine_model,
+                    model_size=main_model,
                     language=self._get_language(),
                     segment_duration=30,
                 )

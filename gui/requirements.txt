@@ -4,6 +4,9 @@ PyQt6-Qt6>=6.6.0
 PyQt6-sip>=13.6.0
 
 # ASR 相關套件（繼承自主專案）
-mlx-whisper
+mlx-whisper>=0.4.1
 pyannote-audio
 torch
+
+# AWS Transcribe streaming (optional, for AWS Transcribe engine)
+amazon-transcribe

@@ -125,7 +125,8 @@ def transcribe_with_speakers(video_file, output_file, language="zh", hf_token=No
         "base": "mlx-community/whisper-base-mlx",
         "small": "mlx-community/whisper-small-mlx",
         "medium": "mlx-community/whisper-medium-mlx",
-        "large": "mlx-community/whisper-large-v3-mlx"
+        "large": "mlx-community/whisper-large-v3-mlx",
+        "large-v3-turbo": "mlx-community/whisper-large-v3-turbo",
     }
     model_path = model_map.get(model_size, model_map["medium"])
     

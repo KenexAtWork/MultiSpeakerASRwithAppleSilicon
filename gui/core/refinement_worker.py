@@ -19,6 +19,16 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 SAMPLE_RATE = 16000
 
+# Import shared model map
+WHISPER_MODEL_MAP = {
+    "tiny": "mlx-community/whisper-tiny-mlx",
+    "base": "mlx-community/whisper-base-mlx",
+    "small": "mlx-community/whisper-small-mlx",
+    "medium": "mlx-community/whisper-medium-mlx",
+    "large": "mlx-community/whisper-large-v3-mlx",
+    "large-v3-turbo": "mlx-community/whisper-large-v3-turbo",
+}
+
 
 class RefinementSegment:
     """A segment of refined transcription with timing info."""
@@ -149,7 +159,7 @@ class IncrementalRefinementWorker(QThread):
             return None
 
         self.status.emit(f"Loading refinement model (whisper-{self.model_size})...")
-        model_name = f"mlx-community/whisper-{self.model_size}-mlx"
+        model_name = WHISPER_MODEL_MAP.get(self.model_size, f"mlx-community/whisper-{self.model_size}-mlx")
         lang = None if self.language == "auto" else self.language
 
         def transcribe_fn(wav_path):
@@ -275,7 +285,7 @@ class PostRecordingRefinementWorker(QThread):
             self.error.emit("mlx_whisper not installed.")
             return
 
-        model_name = f"mlx-community/whisper-{self.model_size}-mlx"
+        model_name = WHISPER_MODEL_MAP.get(self.model_size, f"mlx-community/whisper-{self.model_size}-mlx")
         lang = None if self.language == "auto" else self.language
 
         # Save full audio to temp file
