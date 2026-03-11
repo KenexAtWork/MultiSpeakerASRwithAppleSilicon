@@ -539,6 +539,14 @@ class RealtimePanel(QWidget):
     def _on_engine_changed(self, index):
         self.model_combo.setEnabled(True)
         self._update_model_options()
+        # Refinement uses MLX Whisper — disable when using other engines
+        is_mlx = self.engine_combo.currentData() == ENGINE_WHISPER
+        self.refine_incremental_cb.setEnabled(is_mlx)
+        self.refine_post_cb.setEnabled(is_mlx)
+        self.refine_model_combo.setEnabled(is_mlx)
+        if not is_mlx:
+            self.refine_incremental_cb.setChecked(False)
+            self.refine_post_cb.setChecked(False)
 
     def _on_device_changed(self, index):
         """Restart mic preview when user selects a different device."""
@@ -648,8 +656,9 @@ class RealtimePanel(QWidget):
         )
         self._recording_timer.start()
 
-        # Start incremental refinement if enabled
-        if self.refine_incremental_cb.isChecked():
+        # Start incremental refinement if enabled (MLX Whisper only)
+        can_refine = self._get_engine() == ENGINE_WHISPER
+        if can_refine and self.refine_incremental_cb.isChecked():
             refine_model = self._get_refine_model()
             self._incremental_worker = IncrementalRefinementWorker(
                 engine=self._get_engine(),
@@ -667,7 +676,7 @@ class RealtimePanel(QWidget):
             self.refine_status_label.setText("⏳ Incremental refinement starting...")
 
         # Connect raw_chunk for post-recording (always, to accumulate audio)
-        if self.refine_post_cb.isChecked() or self.refine_incremental_cb.isChecked():
+        if can_refine and (self.refine_post_cb.isChecked() or self.refine_incremental_cb.isChecked()):
             if not self.refine_incremental_cb.isChecked():
                 # Need a lightweight accumulator if only post-recording is enabled
                 self._raw_audio_chunks = []
@@ -709,8 +718,8 @@ class RealtimePanel(QWidget):
             self.refine_vod_btn.setEnabled(True)
             self.refine_group.setVisible(True)
 
-        # Trigger post-recording refinement
-        if self.refine_post_cb.isChecked():
+        # Trigger post-recording refinement (MLX Whisper only)
+        if self.refine_post_cb.isChecked() and self._get_engine() == ENGINE_WHISPER:
             self._start_post_refinement()
 
         self.start_btn.setText("🎙 Start")
