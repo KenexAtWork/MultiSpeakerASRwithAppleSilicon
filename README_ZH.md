@@ -65,6 +65,7 @@ brew install ffmpeg
 
 # 2. 安裝 uv（Python 套件管理器，比 pip 快 10-100 倍）
 curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env   # 將 uv 加入當前 shell 的 PATH
 
 # 3. Clone 專案
 git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git

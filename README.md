@@ -65,6 +65,7 @@ brew install ffmpeg
 
 # 2. Install uv (Python package manager, 10-100x faster than pip)
 curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env   # Add uv to current shell PATH
 
 # 3. Clone the project
 git clone https://github.com/KenexAtWork/MultiSpeakerASRwithAppleSilicon.git

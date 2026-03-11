@@ -21,8 +21,11 @@ if ! command -v uv &>/dev/null; then
     echo "提示：uv 比 pip 快 10-100 倍，且可自動管理 Python 版本"
     curl -LsSf https://astral.sh/uv/install.sh | sh
     
-    # 重新載入 PATH
-    export PATH="$HOME/.cargo/bin:$PATH"
+    # 重新載入 PATH（uv 可能安裝在 ~/.local/bin 或 ~/.cargo/bin）
+    if [ -f "$HOME/.local/bin/env" ]; then
+        source "$HOME/.local/bin/env"
+    fi
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
     
     if ! command -v uv &>/dev/null; then
         echo "❌ uv 安裝失敗"
