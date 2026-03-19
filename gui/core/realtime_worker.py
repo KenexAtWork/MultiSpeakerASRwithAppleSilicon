@@ -25,6 +25,7 @@ SILENCE_THRESHOLD = 0.01  # RMS threshold for silence detection
 ENGINE_WHISPER = "mlx-whisper"
 ENGINE_QWEN3 = "qwen3-asr"
 ENGINE_TRANSCRIBE = "aws-transcribe"
+ENGINE_NOVA_SONIC = "nova-sonic"
 
 # MLX Whisper model map (shared across all components)
 WHISPER_MODEL_MAP = {
@@ -98,7 +99,10 @@ class RealtimeASRWorker(QThread):
         self._paused = False
 
         # --- Load engine ---
-        if self.engine == ENGINE_TRANSCRIBE:
+        if self.engine == ENGINE_NOVA_SONIC:
+            self._run_nova_sonic()
+            return
+        elif self.engine == ENGINE_TRANSCRIBE:
             transcribe_fn = self._init_transcribe()
         elif self.engine == ENGINE_QWEN3:
             transcribe_fn = self._init_qwen3()
@@ -242,6 +246,290 @@ class RealtimeASRWorker(QThread):
             return result.get("text", "").strip()
 
         return transcribe_fn
+
+    def _run_nova_sonic(self):
+        """Run Nova Sonic 2 bidirectional streaming ASR (fully async)."""
+        import asyncio
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self._nova_sonic_session())
+        except Exception as e:
+            self.error.emit(f"Nova Sonic error: {e}")
+        finally:
+            self.status_changed.emit("Stopped")
+            self.stopped.emit()
+
+    async def _nova_sonic_session(self):
+        """Main Nova Sonic session with auto-reconnect."""
+        try:
+            from aws_sdk_bedrock_runtime.client import (
+                BedrockRuntimeClient,
+                InvokeModelWithBidirectionalStreamOperationInput,
+            )
+            from aws_sdk_bedrock_runtime.models import (
+                InvokeModelWithBidirectionalStreamInputChunk,
+                BidirectionalInputPayloadPart,
+            )
+            from aws_sdk_bedrock_runtime.config import (
+                Config, HTTPAuthSchemeResolver, SigV4AuthScheme,
+            )
+            from smithy_aws_core.identity import EnvironmentCredentialsResolver
+        except ImportError:
+            self.error.emit(
+                "aws-sdk-bedrock-runtime not installed.\n"
+                "Run: uv pip install aws-sdk-python-bedrock-runtime"
+            )
+            return
+
+        import sounddevice as sd
+        import base64
+        import json
+        import uuid
+
+        region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+        model_id = "amazon.nova-2-sonic-v1:0"
+
+        RECONNECT_INTERVAL = 7 * 60  # reconnect at 7 min (limit is 8 min)
+
+        self.status_changed.emit("Connecting to Nova Sonic 2...")
+
+        while self._running:
+            # --- Create client & stream ---
+            config = Config(
+                endpoint_uri=f"https://bedrock-runtime.{region}.amazonaws.com",
+                region=region,
+                aws_credentials_identity_resolver=EnvironmentCredentialsResolver(),
+                auth_scheme_resolver=HTTPAuthSchemeResolver(),
+                auth_schemes={"aws.auth#sigv4": SigV4AuthScheme(service="bedrock")},
+            )
+            client = BedrockRuntimeClient(config=config)
+            stream = await client.invoke_model_with_bidirectional_stream(
+                InvokeModelWithBidirectionalStreamOperationInput(model_id=model_id)
+            )
+
+            prompt_name = str(uuid.uuid4())
+            content_name = str(uuid.uuid4())
+            audio_content_name = str(uuid.uuid4())
+
+            async def send_event(event_json):
+                event = InvokeModelWithBidirectionalStreamInputChunk(
+                    value=BidirectionalInputPayloadPart(
+                        bytes_=event_json.encode("utf-8")
+                    )
+                )
+                await stream.input_stream.send(event)
+
+            # --- Session start ---
+            await send_event(json.dumps({
+                "event": {
+                    "sessionStart": {
+                        "inferenceConfiguration": {
+                            "maxTokens": 1024,
+                            "topP": 0.9,
+                            "temperature": 0.1,
+                        },
+                        "turnDetectionConfiguration": {
+                            "endpointingSensitivity": "HIGH",
+                        },
+                    }
+                }
+            }))
+
+            # --- Prompt start (ASR-only: no audio output) ---
+            await send_event(json.dumps({
+                "event": {
+                    "promptStart": {
+                        "promptName": prompt_name,
+                        "textOutputConfiguration": {
+                            "mediaType": "text/plain",
+                        },
+                        "audioOutputConfiguration": {
+                            "mediaType": "audio/lpcm",
+                            "sampleRateHertz": 24000,
+                            "sampleSizeBits": 16,
+                            "channelCount": 1,
+                            "voiceId": "matthew",
+                            "encoding": "base64",
+                            "audioType": "SPEECH",
+                        },
+                    }
+                }
+            }))
+
+            # --- System prompt: transcription-only mode ---
+            await send_event(json.dumps({
+                "event": {
+                    "contentStart": {
+                        "promptName": prompt_name,
+                        "contentName": content_name,
+                        "type": "TEXT",
+                        "interactive": True,
+                        "role": "SYSTEM",
+                        "textInputConfiguration": {
+                            "mediaType": "text/plain",
+                        },
+                    }
+                }
+            }))
+
+            system_prompt = (
+                "You are a transcription assistant. Your ONLY job is to accurately "
+                "transcribe what the user says. Do NOT respond, do NOT answer questions, "
+                "do NOT add commentary. Simply output the exact transcription of the "
+                "user's speech. Preserve the original language (Chinese, English, etc). "
+                "Keep your text output minimal — just the transcription."
+            )
+            await send_event(json.dumps({
+                "event": {
+                    "textInput": {
+                        "promptName": prompt_name,
+                        "contentName": content_name,
+                        "content": system_prompt,
+                    }
+                }
+            }))
+
+            await send_event(json.dumps({
+                "event": {
+                    "contentEnd": {
+                        "promptName": prompt_name,
+                        "contentName": content_name,
+                    }
+                }
+            }))
+
+            # --- Start audio input ---
+            await send_event(json.dumps({
+                "event": {
+                    "contentStart": {
+                        "promptName": prompt_name,
+                        "contentName": audio_content_name,
+                        "type": "AUDIO",
+                        "interactive": True,
+                        "role": "USER",
+                        "audioInputConfiguration": {
+                            "mediaType": "audio/lpcm",
+                            "sampleRateHertz": 16000,
+                            "sampleSizeBits": 16,
+                            "channelCount": 1,
+                            "audioType": "SPEECH",
+                            "encoding": "base64",
+                        },
+                    }
+                }
+            }))
+
+            self.status_changed.emit("Listening...")
+
+            # --- Response processor task ---
+            session_active = True
+
+            async def process_responses():
+                nonlocal session_active
+                try:
+                    while session_active and self._running:
+                        output = await stream.await_output()
+                        result = await output[1].receive()
+                        if result.value and result.value.bytes_:
+                            data = json.loads(result.value.bytes_.decode("utf-8"))
+                            if "event" not in data:
+                                continue
+                            evt = data["event"]
+                            # We only care about USER ASR transcription
+                            if "textOutput" in evt:
+                                text = evt["textOutput"].get("content", "").strip()
+                                if text:
+                                    # Check role from last contentStart
+                                    if getattr(self, "_nova_role", "") == "USER":
+                                        if not self._is_hallucination(text):
+                                            self.transcript_update.emit(text)
+                                            self._prev_text = text
+                            elif "contentStart" in evt:
+                                cs = evt["contentStart"]
+                                self._nova_role = cs.get("role", "")
+                except Exception:
+                    pass  # stream closed or reconnecting
+
+            response_task = asyncio.create_task(process_responses())
+
+            # --- Audio capture & send loop ---
+            audio_queue = asyncio.Queue()
+
+            def audio_callback(indata, frames, time_info, status):
+                if not self._paused and self._running:
+                    audio_int16 = (indata[:, 0] * 32767).astype(np.int16)
+                    audio_queue.put_nowait(audio_int16.tobytes())
+                    # VU meter
+                    rms = float(np.sqrt(np.mean(indata[:, 0] ** 2)))
+                    self.level_update.emit(min(rms * 10, 1.0))
+
+            try:
+                mic_stream = sd.InputStream(
+                    samplerate=SAMPLE_RATE,
+                    channels=CHANNELS,
+                    dtype="float32",
+                    blocksize=1024,
+                    device=self.device_index,
+                    callback=audio_callback,
+                )
+                mic_stream.start()
+            except Exception as e:
+                self.error.emit(f"Microphone error: {e}")
+                session_active = False
+                response_task.cancel()
+                return
+
+            session_start_time = time.time()
+            try:
+                while self._running:
+                    # Check reconnect timer
+                    elapsed = time.time() - session_start_time
+                    if elapsed >= RECONNECT_INTERVAL:
+                        self.status_changed.emit("Reconnecting...")
+                        break  # break inner loop to reconnect
+
+                    # Send audio chunks
+                    try:
+                        audio_bytes = await asyncio.wait_for(
+                            audio_queue.get(), timeout=0.1
+                        )
+                        blob = base64.b64encode(audio_bytes).decode("utf-8")
+                        await send_event(json.dumps({
+                            "event": {
+                                "audioInput": {
+                                    "promptName": prompt_name,
+                                    "contentName": audio_content_name,
+                                    "content": blob,
+                                }
+                            }
+                        }))
+                    except asyncio.TimeoutError:
+                        continue
+            finally:
+                mic_stream.stop()
+                mic_stream.close()
+                session_active = False
+                response_task.cancel()
+                # End session gracefully
+                try:
+                    await send_event(json.dumps({
+                        "event": {
+                            "contentEnd": {
+                                "promptName": prompt_name,
+                                "contentName": audio_content_name,
+                            }
+                        }
+                    }))
+                    await send_event(json.dumps({
+                        "event": {"promptEnd": {"promptName": prompt_name}}
+                    }))
+                    await send_event(json.dumps({
+                        "event": {"sessionEnd": {}}
+                    }))
+                    await stream.input_stream.close()
+                except Exception:
+                    pass
 
     def _init_qwen3(self):
         """Initialize Qwen3-ASR and return a transcribe function."""

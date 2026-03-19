@@ -12,7 +12,7 @@ from pathlib import Path
 import json
 import os
 
-from core.realtime_worker import RealtimeASRWorker, ENGINE_WHISPER, ENGINE_QWEN3, ENGINE_TRANSCRIBE
+from core.realtime_worker import RealtimeASRWorker, ENGINE_WHISPER, ENGINE_QWEN3, ENGINE_TRANSCRIBE, ENGINE_NOVA_SONIC
 from core.live_summary_worker import LiveSummaryWorker
 from core.refinement_worker import IncrementalRefinementWorker, PostRecordingRefinementWorker
 
@@ -121,6 +121,7 @@ class RealtimePanel(QWidget):
         self.engine_combo.addItem("MLX Whisper", ENGINE_WHISPER)
         self.engine_combo.addItem("Qwen3-ASR", ENGINE_QWEN3)
         self.engine_combo.addItem("AWS Transcribe", ENGINE_TRANSCRIBE)
+        self.engine_combo.addItem("Nova Sonic 2 ☁️", ENGINE_NOVA_SONIC)
         self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
         settings_layout.addWidget(self.engine_combo)
 
@@ -524,6 +525,8 @@ class RealtimePanel(QWidget):
         engine = self.engine_combo.currentData()
         if engine == ENGINE_TRANSCRIBE:
             return "cloud"
+        if engine == ENGINE_NOVA_SONIC:
+            return "cloud"
         if engine == ENGINE_QWEN3:
             return "small" if "0.6B" in text else "large"
         # MLX Whisper: extract model size key
@@ -568,6 +571,9 @@ class RealtimePanel(QWidget):
             self.model_combo.setCurrentIndex(0)
         elif engine == ENGINE_TRANSCRIBE:
             self.model_combo.addItems(["cloud (AWS managed)"])
+            self.model_combo.setEnabled(False)
+        elif engine == ENGINE_NOVA_SONIC:
+            self.model_combo.addItems(["cloud (Nova Sonic 2)"])
             self.model_combo.setEnabled(False)
         else:
             self.model_combo.setEnabled(True)
