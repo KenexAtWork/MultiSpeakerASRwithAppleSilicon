@@ -250,18 +250,21 @@ class RealtimeASRWorker(QThread):
     def _run_nova_sonic(self):
         """Run Nova Sonic 2 bidirectional streaming ASR (fully async)."""
         import asyncio
+        import traceback
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             loop.run_until_complete(self._nova_sonic_session())
         except Exception as e:
-            self.error.emit(f"Nova Sonic error: {e}")
+            tb = traceback.format_exc()
+            self.error.emit(f"Nova Sonic error: {e}\n\n{tb}")
         finally:
             self.status_changed.emit("Stopped")
             self.stopped.emit()
 
     async def _nova_sonic_session(self):
         """Main Nova Sonic session with auto-reconnect."""
+        import asyncio
         try:
             from aws_sdk_bedrock_runtime.client import (
                 BedrockRuntimeClient,
@@ -278,7 +281,7 @@ class RealtimeASRWorker(QThread):
         except ImportError:
             self.error.emit(
                 "aws-sdk-bedrock-runtime not installed.\n"
-                "Run: uv pip install aws-sdk-python-bedrock-runtime"
+                "Run: uv pip install \"aws-sdk-python[bedrock-runtime]\""
             )
             return
 
@@ -286,27 +289,74 @@ class RealtimeASRWorker(QThread):
         import base64
         import json
         import uuid
+        import traceback
 
-        region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+        # Region: check BEDROCK_REGION first, then AWS_DEFAULT_REGION
+        region = os.environ.get("BEDROCK_REGION",
+                 os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
         model_id = "amazon.nova-2-sonic-v1:0"
 
         RECONNECT_INTERVAL = 7 * 60  # reconnect at 7 min (limit is 8 min)
 
-        self.status_changed.emit("Connecting to Nova Sonic 2...")
+        self.status_changed.emit(f"Connecting to Nova Sonic 2 ({region})...")
 
         while self._running:
             # --- Create client & stream ---
-            config = Config(
-                endpoint_uri=f"https://bedrock-runtime.{region}.amazonaws.com",
-                region=region,
-                aws_credentials_identity_resolver=EnvironmentCredentialsResolver(),
-                auth_scheme_resolver=HTTPAuthSchemeResolver(),
-                auth_schemes={"aws.auth#sigv4": SigV4AuthScheme(service="bedrock")},
-            )
-            client = BedrockRuntimeClient(config=config)
-            stream = await client.invoke_model_with_bidirectional_stream(
-                InvokeModelWithBidirectionalStreamOperationInput(model_id=model_id)
-            )
+            try:
+                self.status_changed.emit(f"Initializing Bedrock client ({region})...")
+
+                # Try environment vars first, fall back to ~/.aws/credentials
+                cred_resolver = EnvironmentCredentialsResolver()
+                has_env_creds = (
+                    os.environ.get("AWS_ACCESS_KEY_ID")
+                    and os.environ.get("AWS_SECRET_ACCESS_KEY")
+                )
+                if not has_env_creds:
+                    # Try boto3 session to get credentials from ~/.aws/credentials or SSO
+                    try:
+                        import boto3
+                        session = boto3.Session()
+                        creds = session.get_credentials()
+                        if creds:
+                            frozen = creds.get_frozen_credentials()
+                            os.environ["AWS_ACCESS_KEY_ID"] = frozen.access_key
+                            os.environ["AWS_SECRET_ACCESS_KEY"] = frozen.secret_key
+                            if frozen.token:
+                                os.environ["AWS_SESSION_TOKEN"] = frozen.token
+                            self.status_changed.emit("Using AWS credentials from profile...")
+                        else:
+                            self.error.emit(
+                                "No AWS credentials found.\n"
+                                "Set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY in .env,\n"
+                                "or configure ~/.aws/credentials"
+                            )
+                            return
+                    except Exception as cred_err:
+                        self.error.emit(f"Cannot resolve AWS credentials: {cred_err}")
+                        return
+
+                config = Config(
+                    endpoint_uri=f"https://bedrock-runtime.{region}.amazonaws.com",
+                    region=region,
+                    aws_credentials_identity_resolver=cred_resolver,
+                    auth_scheme_resolver=HTTPAuthSchemeResolver(),
+                    auth_schemes={"aws.auth#sigv4": SigV4AuthScheme(service="bedrock")},
+                )
+                client = BedrockRuntimeClient(config=config)
+                self.status_changed.emit("Opening bidirectional stream...")
+                stream = await client.invoke_model_with_bidirectional_stream(
+                    InvokeModelWithBidirectionalStreamOperationInput(model_id=model_id)
+                )
+                self.status_changed.emit("Stream connected, setting up session...")
+            except Exception as e:
+                tb = traceback.format_exc()
+                self.error.emit(
+                    f"Failed to connect to Nova Sonic 2:\n{e}\n\n"
+                    f"Check:\n- AWS credentials configured\n"
+                    f"- Region '{region}' supports Nova Sonic\n"
+                    f"- Bedrock model access enabled\n\n{tb}"
+                )
+                return
 
             prompt_name = str(uuid.uuid4())
             content_name = str(uuid.uuid4())
@@ -321,6 +371,7 @@ class RealtimeASRWorker(QThread):
                 await stream.input_stream.send(event)
 
             # --- Session start ---
+            self.status_changed.emit("Sending session start...")
             await send_event(json.dumps({
                 "event": {
                     "sessionStart": {
@@ -400,6 +451,7 @@ class RealtimeASRWorker(QThread):
             }))
 
             # --- Start audio input ---
+            self.status_changed.emit("Starting audio input stream...")
             await send_event(json.dumps({
                 "event": {
                     "contentStart": {
@@ -440,16 +492,21 @@ class RealtimeASRWorker(QThread):
                             if "textOutput" in evt:
                                 text = evt["textOutput"].get("content", "").strip()
                                 if text:
-                                    # Check role from last contentStart
-                                    if getattr(self, "_nova_role", "") == "USER":
+                                    role = getattr(self, "_nova_role", "")
+                                    if role == "USER":
                                         if not self._is_hallucination(text):
                                             self.transcript_update.emit(text)
                                             self._prev_text = text
                             elif "contentStart" in evt:
                                 cs = evt["contentStart"]
                                 self._nova_role = cs.get("role", "")
-                except Exception:
-                    pass  # stream closed or reconnecting
+                            elif "completionStart" in evt:
+                                pass  # session metadata
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    if session_active and self._running:
+                        self.status_changed.emit(f"Response error: {e}")
 
             response_task = asyncio.create_task(process_responses())
 
