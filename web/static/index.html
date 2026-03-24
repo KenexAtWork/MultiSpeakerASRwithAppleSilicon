@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live ASR</title>
+  <title>Live ASR — Dual Engine Compare</title>
   <style>
     :root {
       --bg: #1a1a2e;
@@ -32,7 +32,7 @@
 
     header {
       background: var(--surface);
-      padding: 16px 24px;
+      padding: 14px 24px;
       display: flex;
       align-items: center;
       gap: 16px;
@@ -49,7 +49,7 @@
       gap: 12px;
       align-items: center;
       flex-wrap: wrap;
-      padding: 16px 24px;
+      padding: 12px 24px;
       background: var(--surface);
     }
 
@@ -67,11 +67,6 @@
       color: var(--text);
       font-size: 14px;
       cursor: pointer;
-    }
-
-    .controls select:focus,
-    .controls button:focus {
-      outline: 2px solid var(--accent);
     }
 
     .btn-record {
@@ -115,13 +110,14 @@
     }
 
     .status-bar {
-      padding: 8px 24px;
+      padding: 6px 24px;
       font-size: 13px;
       color: var(--muted);
       background: var(--surface);
       border-bottom: 1px solid #222;
       display: flex;
       justify-content: space-between;
+      align-items: center;
     }
 
     .vu-meter {
@@ -139,31 +135,80 @@
       transition: width 0.1s;
     }
 
-    main {
+    .timer {
+      font-family: monospace;
+      font-size: 14px;
+      color: var(--accent);
+    }
+
+    .columns {
       flex: 1;
-      padding: 24px;
+      display: flex;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    .column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #333;
+    }
+
+    .column:last-child {
+      border-right: none;
+    }
+
+    .col-header {
+      padding: 10px 16px;
+      background: var(--primary);
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .col-header .engine-tag {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .tag-nova {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .tag-transcribe {
+      background: #2196f3;
+      color: #fff;
+    }
+
+    .col-status {
+      padding: 4px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .transcript-area {
+      flex: 1;
       overflow-y: auto;
+      padding: 12px 16px;
+      line-height: 1.7;
+      font-size: 15px;
     }
 
-    #transcript {
-      max-width: 800px;
-      margin: 0 auto;
-      line-height: 1.8;
-      font-size: 16px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      min-height: 200px;
-    }
-
-    #transcript:empty::before {
-      content: "按下「開始錄音」即時顯示語音辨識結果...";
+    .transcript-area:empty::before {
+      content: "等待語音輸入...";
       color: var(--muted);
       font-style: italic;
     }
 
     .segment {
       margin-bottom: 4px;
-      padding: 4px 8px;
+      padding: 3px 6px;
       border-radius: 4px;
     }
 
@@ -171,10 +216,11 @@
       background: rgba(255, 255, 255, 0.05);
     }
 
-    .timer {
+    .tc {
+      color: #888;
+      font-size: 12px;
       font-family: monospace;
-      font-size: 14px;
-      color: var(--accent);
+      margin-right: 6px;
     }
   </style>
 </head>
@@ -182,17 +228,10 @@
 <body>
 
   <header>
-    <h1>🎙️ Live ASR</h1>
+    <h1>🎙️ Live ASR — Dual Engine Compare</h1>
   </header>
 
   <div class="controls">
-    <div>
-      <label>Engine</label><br>
-      <select id="engine">
-        <option value="nova-sonic">Nova Sonic 2 ☁️</option>
-        <option value="transcribe">AWS Transcribe ☁️</option>
-      </select>
-    </div>
     <div>
       <label>Language</label><br>
       <select id="language">
@@ -224,144 +263,142 @@
     </div>
     <div>
       <label>&nbsp;</label><br>
-      <button class="btn-export" id="clearBtn" onclick="clearTranscript()">🗑️ 清除</button>
+      <button class="btn-export" id="clearBtn" onclick="clearAll()">🗑️ 清除</button>
     </div>
   </div>
 
   <div class="status-bar">
-    <span id="status">Ready</span>
+    <span id="globalStatus">Ready</span>
     <span class="timer" id="timer">00:00:00</span>
     <div class="vu-meter">
       <div class="vu-fill" id="vuFill"></div>
     </div>
   </div>
 
-  <main>
-    <div id="transcript"></div>
-  </main>
+  <div class="columns">
+    <div class="column">
+      <div class="col-header">
+        <span>Nova Sonic 2</span>
+        <span class="engine-tag tag-nova">☁️ Bedrock</span>
+      </div>
+      <div class="col-status" id="statusNova">—</div>
+      <div class="transcript-area" id="transcriptNova"></div>
+    </div>
+    <div class="column">
+      <div class="col-header">
+        <span>AWS Transcribe</span>
+        <span class="engine-tag tag-transcribe">☁️ Streaming</span>
+      </div>
+      <div class="col-status" id="statusTranscribe">—</div>
+      <div class="transcript-area" id="transcriptTranscribe"></div>
+    </div>
+  </div>
 
   <script>
     // State
-    let ws = null;
-    let mediaStream = null;
-    let audioContext = null;
-    let processor = null;
-    let recording = false;
-    let segments = [];       // {text, timestamp}
-    let startTime = null;
-    let timerInterval = null;
-
-    // Audio recording buffer (for WAV export)
+    let wsNova = null, wsTranscribe = null;
+    let mediaStream = null, audioContext = null, processor = null;
+    let recording = false, startTime = null, timerInterval = null;
+    let segmentsNova = [], segmentsTranscribe = [];
     let recordedChunks = [];
 
     const recordBtn = document.getElementById('recordBtn');
-    const status = document.getElementById('status');
-    const timer = document.getElementById('timer');
-    const transcript = document.getElementById('transcript');
+    const globalStatus = document.getElementById('globalStatus');
+    const timerEl = document.getElementById('timer');
     const vuFill = document.getElementById('vuFill');
-
-    function setStatus(msg) { status.textContent = msg; }
+    const tNova = document.getElementById('transcriptNova');
+    const tTranscribe = document.getElementById('transcriptTranscribe');
+    const sNova = document.getElementById('statusNova');
+    const sTranscribe = document.getElementById('statusTranscribe');
 
     function updateTimer() {
       if (!startTime) return;
-      const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
-      const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
-      const s = String(elapsed % 60).padStart(2, '0');
-      timer.textContent = `${h}:${m}:${s}`;
+      const e = Math.floor((Date.now() - startTime) / 1000);
+      timerEl.textContent = `${String(Math.floor(e / 3600)).padStart(2, '0')}:${String(Math.floor((e % 3600) / 60)).padStart(2, '0')}:${String(e % 60).padStart(2, '0')}`;
+    }
+
+    function formatTC(sec) {
+      return `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+    }
+
+    function escHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    function appendTo(container, segments, text, elapsed) {
+      segments.push({ text, timestamp: elapsed });
+      const div = document.createElement('div');
+      div.className = 'segment';
+      div.innerHTML = `<span class="tc">[${formatTC(elapsed)}]</span>${escHtml(text)}`;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function createWS(engine, container, statusEl, segments) {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const language = document.getElementById('language').value;
+      const ws = new WebSocket(`${proto}://${location.host}/ws/asr`);
+      ws.binaryType = 'arraybuffer';
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ engine, language }));
+        statusEl.textContent = 'Connecting...';
+      };
+      ws.onmessage = (evt) => {
+        const data = JSON.parse(evt.data);
+        if (data.type === 'transcript') {
+          const elapsed = data.time || (startTime ? (Date.now() - startTime) / 1000 : 0);
+          appendTo(container, segments, data.text, elapsed);
+        } else if (data.type === 'status') {
+          statusEl.textContent = data.text;
+        } else if (data.type === 'error') {
+          statusEl.textContent = `Error: ${data.text}`;
+        }
+      };
+      ws.onclose = () => { statusEl.textContent = 'Disconnected'; };
+      ws.onerror = () => { statusEl.textContent = 'Connection error'; };
+      return ws;
     }
 
     async function toggleRecording() {
-      if (recording) {
-        stopRecording();
-      } else {
-        await startRecording();
-      }
+      if (recording) stopRecording(); else await startRecording();
     }
 
     async function startRecording() {
-      const engine = document.getElementById('engine').value;
-      const language = document.getElementById('language').value;
-
-      // Get mic
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
         });
       } catch (e) {
-        setStatus('Microphone access denied');
+        globalStatus.textContent = 'Microphone access denied';
         return;
       }
 
-      // WebSocket
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      ws = new WebSocket(`${proto}://${location.host}/ws/asr`);
-      ws.binaryType = 'arraybuffer';
+      // Open two WebSockets
+      wsNova = createWS('nova-sonic', tNova, sNova, segmentsNova);
+      wsTranscribe = createWS('transcribe', tTranscribe, sTranscribe, segmentsTranscribe);
 
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ engine, language }));
-      };
-
-      ws.onmessage = (evt) => {
-        const data = JSON.parse(evt.data);
-        if (data.type === 'transcript') {
-          const elapsed = startTime ? ((Date.now() - startTime) / 1000) : 0;
-          segments.push({ text: data.text, timestamp: elapsed });
-          appendSegment(data.text);
-        } else if (data.type === 'status') {
-          setStatus(data.text);
-        } else if (data.type === 'error') {
-          setStatus(`Error: ${data.text}`);
-        }
-      };
-
-      ws.onclose = () => {
-        if (recording) stopRecording();
-      };
-
-      ws.onerror = () => {
-        setStatus('WebSocket error');
-      };
-
-      // Audio processing: capture PCM 16kHz int16 and send via WS
+      // Audio capture
       audioContext = new AudioContext({ sampleRate: 16000 });
       const source = audioContext.createMediaStreamSource(mediaStream);
-
-      // ScriptProcessor for raw PCM (AudioWorklet would be better but this is simpler)
       processor = audioContext.createScriptProcessor(4096, 1, 1);
-      let analyser = audioContext.createAnalyser();
+      const analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
-
       source.connect(analyser);
       analyser.connect(processor);
       processor.connect(audioContext.destination);
-
       const vuData = new Float32Array(analyser.fftSize);
 
       processor.onaudioprocess = (e) => {
         if (!recording) return;
-        const float32 = e.inputBuffer.getChannelData(0);
-
-        // Convert to int16
-        const int16 = new Int16Array(float32.length);
-        for (let i = 0; i < float32.length; i++) {
-          int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
-        }
-
-        // Save for WAV export
-        recordedChunks.push(new Int16Array(int16));
-
-        // Send to server
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(int16.buffer);
-        }
-
-        // VU meter
+        const f32 = e.inputBuffer.getChannelData(0);
+        const i16 = new Int16Array(f32.length);
+        for (let i = 0; i < f32.length; i++) i16[i] = Math.max(-32768, Math.min(32767, Math.round(f32[i] * 32767)));
+        recordedChunks.push(new Int16Array(i16));
+        // Send to both
+        if (wsNova && wsNova.readyState === WebSocket.OPEN) wsNova.send(i16.buffer);
+        if (wsTranscribe && wsTranscribe.readyState === WebSocket.OPEN) wsTranscribe.send(i16.buffer);
+        // VU
         analyser.getFloatTimeDomainData(vuData);
-        let sum = 0;
-        for (let i = 0; i < vuData.length; i++) sum += vuData[i] * vuData[i];
-        const rms = Math.sqrt(sum / vuData.length);
-        vuFill.style.width = Math.min(rms * 800, 100) + '%';
+        let sum = 0; for (let i = 0; i < vuData.length; i++) sum += vuData[i] * vuData[i];
+        vuFill.style.width = Math.min(Math.sqrt(sum / vuData.length) * 800, 100) + '%';
       };
 
       recording = true;
@@ -369,76 +406,70 @@
       timerInterval = setInterval(updateTimer, 1000);
       recordBtn.textContent = '⏹️ 停止錄音';
       recordBtn.classList.add('recording');
-      document.getElementById('engine').disabled = true;
       document.getElementById('language').disabled = true;
-      setStatus('Connecting...');
+      globalStatus.textContent = 'Recording...';
+    }
+
+    function closeWS(ws) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try { ws.send(JSON.stringify({ action: 'stop' })); } catch (e) { }
+        ws.close();
+      }
     }
 
     function stopRecording() {
       recording = false;
-
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ action: 'stop' }));
-        ws.close();
-      }
-      ws = null;
-
+      closeWS(wsNova); closeWS(wsTranscribe);
+      wsNova = null; wsTranscribe = null;
       if (processor) { processor.disconnect(); processor = null; }
       if (audioContext) { audioContext.close(); audioContext = null; }
       if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-
       clearInterval(timerInterval);
       recordBtn.textContent = '🎙️ 開始錄音';
       recordBtn.classList.remove('recording');
-      document.getElementById('engine').disabled = false;
       document.getElementById('language').disabled = false;
       vuFill.style.width = '0%';
-      setStatus('Stopped');
-
-      // Enable export buttons
-      document.getElementById('exportTxtBtn').disabled = segments.length === 0;
-      document.getElementById('exportSrtBtn').disabled = segments.length === 0;
+      globalStatus.textContent = 'Stopped';
+      document.getElementById('exportTxtBtn').disabled = (segmentsNova.length + segmentsTranscribe.length) === 0;
+      document.getElementById('exportSrtBtn').disabled = (segmentsNova.length + segmentsTranscribe.length) === 0;
       document.getElementById('exportWavBtn').disabled = recordedChunks.length === 0;
     }
 
-    function appendSegment(text) {
-      const div = document.createElement('div');
-      div.className = 'segment';
-      div.textContent = text;
-      transcript.appendChild(div);
-      // Auto-scroll
-      transcript.scrollTop = transcript.scrollHeight;
-    }
-
-    function clearTranscript() {
-      transcript.innerHTML = '';
-      segments = [];
+    function clearAll() {
+      tNova.innerHTML = ''; tTranscribe.innerHTML = '';
+      segmentsNova = []; segmentsTranscribe = [];
       recordedChunks = [];
-      timer.textContent = '00:00:00';
+      timerEl.textContent = '00:00:00';
+      sNova.textContent = '—'; sTranscribe.textContent = '—';
       document.getElementById('exportTxtBtn').disabled = true;
       document.getElementById('exportSrtBtn').disabled = true;
       document.getElementById('exportWavBtn').disabled = true;
-      setStatus('Ready');
+      globalStatus.textContent = 'Ready';
     }
 
-    // ---- Export functions ----
-
+    // ---- Exports ----
     function exportTxt() {
-      const text = segments.map(s => s.text).join('\n');
-      download('transcript.txt', text, 'text/plain');
+      let txt = '=== Nova Sonic 2 ===\n';
+      txt += segmentsNova.map(s => `[${formatTC(s.timestamp)}] ${s.text}`).join('\n');
+      txt += '\n\n=== AWS Transcribe ===\n';
+      txt += segmentsTranscribe.map(s => `[${formatTC(s.timestamp)}] ${s.text}`).join('\n');
+      download('transcript_compare.txt', txt, 'text/plain');
     }
 
     function exportSrt() {
-      let srt = '';
-      segments.forEach((seg, i) => {
-        const start = formatSrtTime(seg.timestamp);
-        const end = formatSrtTime(seg.timestamp + 3); // estimate 3s per segment
-        srt += `${i + 1}\n${start} --> ${end}\n${seg.text}\n\n`;
-      });
-      download('transcript.srt', srt, 'text/plain');
+      const toSrt = (segs, label) => {
+        let s = `# ${label}\n\n`;
+        segs.forEach((seg, i) => {
+          const st = fmtSrt(seg.timestamp), en = fmtSrt(seg.timestamp + 3);
+          s += `${i + 1}\n${st} --> ${en}\n${seg.text}\n\n`;
+        });
+        return s;
+      };
+      const srt = toSrt(segmentsNova, 'Nova Sonic 2') + toSrt(segmentsTranscribe, 'AWS Transcribe');
+      download('transcript_compare.srt', srt, 'text/plain');
     }
 
-    function formatSrtTime(sec) {
+    function fmtSrt(sec) {
       const h = String(Math.floor(sec / 3600)).padStart(2, '0');
       const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
       const s = String(Math.floor(sec % 60)).padStart(2, '0');
@@ -447,51 +478,27 @@
     }
 
     function exportWav() {
-      // Merge all int16 chunks into one WAV
-      let totalLen = 0;
-      recordedChunks.forEach(c => totalLen += c.length);
-      const merged = new Int16Array(totalLen);
-      let offset = 0;
-      recordedChunks.forEach(c => { merged.set(c, offset); offset += c.length; });
-
-      const wavBuffer = encodeWav(merged, 16000);
-      const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+      let len = 0; recordedChunks.forEach(c => len += c.length);
+      const merged = new Int16Array(len);
+      let off = 0; recordedChunks.forEach(c => { merged.set(c, off); off += c.length; });
+      const buf = new ArrayBuffer(44 + merged.length * 2);
+      const v = new DataView(buf);
+      const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + merged.length * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      w(36, 'data'); v.setUint32(40, merged.length * 2, true);
+      for (let i = 0; i < merged.length; i++) v.setInt16(44 + i * 2, merged[i], true);
+      const blob = new Blob([buf], { type: 'audio/wav' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'recording.wav';
-      a.click();
+      const a = document.createElement('a'); a.href = url; a.download = 'recording.wav'; a.click();
       URL.revokeObjectURL(url);
     }
 
-    function encodeWav(samples, sampleRate) {
-      const buffer = new ArrayBuffer(44 + samples.length * 2);
-      const view = new DataView(buffer);
-      function writeStr(offset, str) { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
-      writeStr(0, 'RIFF');
-      view.setUint32(4, 36 + samples.length * 2, true);
-      writeStr(8, 'WAVE');
-      writeStr(12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, 1, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeStr(36, 'data');
-      view.setUint32(40, samples.length * 2, true);
-      for (let i = 0; i < samples.length; i++) view.setInt16(44 + i * 2, samples[i], true);
-      return buffer;
-    }
-
-    function download(filename, content, mime) {
+    function download(fn, content, mime) {
       const blob = new Blob([content], { type: mime });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
+      const a = document.createElement('a'); a.href = url; a.download = fn; a.click();
       URL.revokeObjectURL(url);
     }
   </script>

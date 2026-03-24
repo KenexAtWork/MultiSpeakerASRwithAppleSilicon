@@ -7,7 +7,11 @@ import json
 import asyncio
 import base64
 import uuid
+import logging
 from pathlib import Path
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("asr")
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -110,8 +114,10 @@ async def _run_nova_sonic(ws: WebSocket, language: str):
     lang_hint = f" The primary language is {language}." if language != "auto" else ""
     system_text = (
         "You are a transcription assistant. Your ONLY job is to accurately "
-        "transcribe what the user says. Do NOT respond or add commentary. "
-        "Output the exact transcription preserving the original language."
+        "transcribe what the user says. Do NOT respond, do NOT answer questions, "
+        "do NOT add commentary. Simply output the exact transcription of the "
+        "user's speech. For Chinese, use Traditional Chinese (繁體中文). "
+        "Keep your text output minimal — just the transcription."
         f"{lang_hint}"
     )
     await send_evt({"event": {"contentStart": {
@@ -143,10 +149,19 @@ async def _run_nova_sonic(ws: WebSocket, language: str):
     # Response reader
     session_active = True
     nova_role = ""
+    session_start = asyncio.get_event_loop().time()
 
     async def read_responses():
         nonlocal nova_role
         try:
+            # Optional: Traditional Chinese converter
+            s2t = None
+            try:
+                import opencc
+                s2t = opencc.OpenCC('s2t')
+            except ImportError:
+                pass
+
             while session_active:
                 output = await stream.await_output()
                 result = await output[1].receive()
@@ -157,24 +172,33 @@ async def _run_nova_sonic(ws: WebSocket, language: str):
                     evt = data["event"]
                     if "textOutput" in evt:
                         text = evt["textOutput"].get("content", "").strip()
+                        # Only take USER role = raw ASR transcription
                         if text and nova_role == "USER":
-                            await ws.send_json({"type": "transcript", "text": text})
+                            if s2t:
+                                text = s2t.convert(text)
+                            elapsed = asyncio.get_event_loop().time() - session_start
+                            log.info(f"ASR: {text[:80]}")
+                            await ws.send_json({"type": "transcript", "text": text, "time": round(elapsed, 2)})
                     elif "contentStart" in evt:
                         nova_role = evt["contentStart"].get("role", "")
         except asyncio.CancelledError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            log.error(f"Response reader error: {e}")
 
     reader_task = asyncio.create_task(read_responses())
 
     # Receive audio from browser and forward
+    audio_chunk_count = 0
     try:
         while True:
             msg = await ws.receive()
             if msg.get("type") == "websocket.disconnect":
                 break
             if "bytes" in msg:
+                audio_chunk_count += 1
+                if audio_chunk_count <= 3 or audio_chunk_count % 50 == 0:
+                    log.info(f"Audio chunk #{audio_chunk_count}, size={len(msg['bytes'])} bytes")
                 audio_b64 = base64.b64encode(msg["bytes"]).decode("utf-8")
                 await send_evt({"event": {"audioInput": {
                     "promptName": prompt_name,
@@ -204,33 +228,43 @@ async def _run_nova_sonic(ws: WebSocket, language: str):
 # ==================== AWS Transcribe Streaming ====================
 
 async def _run_transcribe(ws: WebSocket, language: str):
+    """AWS Transcribe Streaming via amazon-transcribe SDK."""
     from amazon_transcribe.client import TranscribeStreamingClient
     from amazon_transcribe.handlers import TranscriptResultStreamHandler
     from amazon_transcribe.model import TranscriptEvent
+    import traceback
 
     region = os.environ.get("BEDROCK_REGION",
              os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
 
     await ws.send_json({"type": "status", "text": f"Connecting AWS Transcribe ({region})..."})
+    log.info(f"Transcribe: connecting to {region}")
 
-    client = TranscribeStreamingClient(region=region)
-    lang_code = language if language != "auto" else "en-US"
-    # Map short codes to Transcribe language codes
     LANG_MAP = {
         "zh": "zh-CN", "en": "en-US", "ja": "ja-JP", "ko": "ko-KR",
         "fr": "fr-FR", "de": "de-DE", "es": "es-US", "pt": "pt-BR",
         "it": "it-IT", "auto": "en-US",
     }
-    lang_code = LANG_MAP.get(language, language)
+    lang_code = LANG_MAP.get(language, language if "-" in str(language) else "en-US")
+    log.info(f"Transcribe: lang_code={lang_code}")
 
-    transcribe_stream = await client.start_stream_transcription(
-        language_code=lang_code,
-        media_sample_rate_hz=16000,
-        media_encoding="pcm",
-    )
+    try:
+        client = TranscribeStreamingClient(region=region)
+        transcribe_stream = await client.start_stream_transcription(
+            language_code=lang_code,
+            media_sample_rate_hz=16000,
+            media_encoding="pcm",
+        )
+        log.info("Transcribe: stream started")
+    except Exception as e:
+        tb = traceback.format_exc()
+        log.error(f"Transcribe connect error: {e}\n{tb}")
+        await ws.send_json({"type": "error", "text": f"Transcribe error: {e}"})
+        return
+
     await ws.send_json({"type": "status", "text": "Listening..."})
+    transcribe_start = asyncio.get_event_loop().time()
 
-    # Handler to forward results to browser
     class Handler(TranscriptResultStreamHandler):
         async def handle_transcript_event(self, transcript_event: TranscriptEvent):
             results = transcript_event.transcript.results
@@ -239,18 +273,23 @@ async def _run_transcribe(ws: WebSocket, language: str):
                     for alt in result.alternatives:
                         text = alt.transcript.strip()
                         if text:
-                            await ws.send_json({"type": "transcript", "text": text})
+                            elapsed = asyncio.get_event_loop().time() - transcribe_start
+                            log.info(f"Transcribe ASR: {text[:80]}")
+                            await ws.send_json({"type": "transcript", "text": text, "time": round(elapsed, 2)})
 
     handler = Handler(transcribe_stream.output_stream)
     handler_task = asyncio.create_task(handler.handle_events())
 
-    # Receive audio from browser and forward
+    audio_count = 0
     try:
         while True:
             msg = await ws.receive()
             if msg.get("type") == "websocket.disconnect":
                 break
             if "bytes" in msg:
+                audio_count += 1
+                if audio_count <= 3 or audio_count % 100 == 0:
+                    log.info(f"Transcribe audio chunk #{audio_count}, size={len(msg['bytes'])}")
                 await transcribe_stream.input_stream.send_audio_event(
                     audio_chunk=msg["bytes"]
                 )
@@ -260,9 +299,14 @@ async def _run_transcribe(ws: WebSocket, language: str):
                     break
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        log.error(f"Transcribe receive error: {e}")
     finally:
-        await transcribe_stream.input_stream.end_stream()
-        await handler_task
+        try:
+            await transcribe_stream.input_stream.end_stream()
+            await handler_task
+        except Exception:
+            pass
 
 
 # ==================== WebSocket Endpoint ====================
@@ -280,6 +324,7 @@ async def websocket_asr(ws: WebSocket):
 
     engine = config_msg.get("engine", "nova-sonic")
     language = config_msg.get("language", "auto")
+    log.info(f"WebSocket session: engine={engine}, language={language}")
 
     if not _load_aws_credentials():
         await ws.send_json({"type": "error", "text": "AWS credentials not found"})
@@ -294,6 +339,7 @@ async def websocket_asr(ws: WebSocket):
         else:
             await ws.send_json({"type": "error", "text": f"Unknown engine: {engine}"})
     except Exception as e:
+        log.error(f"Engine {engine} error: {e}", exc_info=True)
         try:
             await ws.send_json({"type": "error", "text": str(e)})
         except Exception:

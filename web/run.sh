@@ -24,4 +24,4 @@ python -c "import fastapi" 2>/dev/null || {
 echo "🚀 Starting Web Live ASR at http://localhost:8000"
 echo "💡 Press Ctrl+C to stop"
 echo ""
-uvicorn web.server:app --host 0.0.0.0 --port 8000 --reload
+uvicorn web.server:app --host 0.0.0.0 --port 8000
